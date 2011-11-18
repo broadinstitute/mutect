@@ -6,14 +6,14 @@ import net.sf.samtools.SAMRecord;
 
 import java.util.*;
 
-import org.broadinstitute.sting.gatk.walkers.genotyper.BaseMismatchModel;
-import org.broadinstitute.sting.utils.genotype.DiploidGenotype;
+import org.broadinstitute.sting.gatk.walkers.genotyper.DiploidGenotype;
 import org.broadinstitute.sting.utils.pileup.*;
 import org.broadinstitute.sting.utils.BaseUtils;
+import org.broadinstitute.sting.utils.sam.GATKSAMRecord;
 
 public class LocusReadPile {
     protected ReadBackedPileup pileup;
-    List<SAMRecord> finalPileupReads;
+    List<GATKSAMRecord> finalPileupReads;
     List<Integer> finalPileupOffsets;
 
     protected char refBase;
@@ -158,7 +158,7 @@ public class LocusReadPile {
     }
 
     public int getFilteredBaseCount(int minBaseQualityScore) {
-        return this.finalPileup.getBaseFilteredPileup(minBaseQualityScore).size();
+        return this.finalPileup.getBaseFilteredPileup(minBaseQualityScore).depthOfCoverage();
     }
 
     public List<Byte> getLocusBases(int locusOffset) {

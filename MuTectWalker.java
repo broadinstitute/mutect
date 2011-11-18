@@ -3,8 +3,6 @@ package org.broadinstitute.cga.tools.gatk.walkers.cancer.mutect;
 import java.io.*;
 import java.util.*;
 
-import net.sf.picard.reference.IndexedFastaSequenceFile;
-import net.sf.picard.reference.ReferenceSequence;
 import net.sf.picard.util.FormatUtil;
 import net.sf.samtools.*;
 import net.sf.samtools.util.StringUtil;
@@ -18,12 +16,13 @@ import org.broadinstitute.sting.gatk.contexts.ReferenceContext;
 import org.broadinstitute.sting.gatk.datasources.reads.SAMReaderID;
 import org.broadinstitute.sting.gatk.refdata.RefMetaDataTracker;
 import org.broadinstitute.sting.gatk.walkers.*;
+import org.broadinstitute.sting.gatk.walkers.genotyper.DiploidGenotype;
 import org.broadinstitute.sting.utils.GenomeLoc;
 import org.broadinstitute.sting.utils.pileup.ReadBackedPileup;
 import org.broadinstitute.sting.utils.pileup.PileupElement;
-import org.broadinstitute.sting.utils.genotype.DiploidGenotype;
 import org.broadinstitute.sting.utils.pileup.ReadBackedPileupImpl;
 import org.broadinstitute.sting.utils.sam.AlignmentUtils;
+import org.broadinstitute.sting.utils.sam.GATKSAMRecord;
 import org.broadinstitute.sting.utils.variantcontext.VariantContext;
 
 @PartitionBy(PartitionType.INTERVAL)
@@ -393,7 +392,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
         TreeMap<Double, String> messageByTumorLod = new TreeMap<Double, String>();
 
         ReadBackedPileup pileup = rawContext.getBasePileup();
-        int numberOfReads = pileup.size();
+        int numberOfReads = pileup.depthOfCoverage();
         binReadsProcessed += numberOfReads;
 
         if (binReadsProcessed >= 1000000) {
@@ -426,10 +425,10 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
             int totalPairs = 0;
             int improperPairs = 0;
-            List<PileupElement> primaryPileup = new ArrayList<PileupElement>(pileup.size());
-            List<PileupElement> secondaryPileup = new ArrayList<PileupElement>(pileup.size());
+            List<PileupElement> primaryPileup = new ArrayList<PileupElement>(pileup.depthOfCoverage());
+            List<PileupElement> secondaryPileup = new ArrayList<PileupElement>(pileup.depthOfCoverage());
             for (PileupElement p : pileup ) {
-                final SAMRecord read = p.getRead();
+                final GATKSAMRecord read = p.getRead();
                 final byte base = p.getBase();
 
                 if (base == ((byte)'N') || base == ((byte)'n')) {
@@ -520,7 +519,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                     new ReadBackedPileupImpl(rawContext.getLocation(), tumorPileupElements);
 
             if (BAM_TUMOR_SAMPLE_NAME != null) {
-                tumorPileup = tumorPileup.getPileupForSampleName(BAM_TUMOR_SAMPLE_NAME);
+                tumorPileup = tumorPileup.getPileupForSample(BAM_TUMOR_SAMPLE_NAME);
             }
 
             // TODO: do this filtering much earlier so that in the simulation we are drawing from reads that will pass this filter!
@@ -529,9 +528,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
 
             Collection<VariantContext> panelOfNormalsVC = tracker.getValues(normalPanelRod, rawContext.getLocation());
-
             Collection<VariantContext> cosmicVC = tracker.getValues(cosmicRod, rawContext.getLocation());
-
             Collection<VariantContext> dbsnpVC = tracker.getValues(dbsnpRod, rawContext.getLocation());
 
             // remove the effect of cosmic from dbSNP
@@ -647,7 +644,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 VariableAllelicRatioGenotypeLikelihoods contaminantLikelihoods
                         = new VariableAllelicRatioGenotypeLikelihoods(upRef, contaminantF);
 
-                List<PileupElement> peList = new ArrayList<PileupElement>(tumorReadPile.finalPileup.size());
+                List<PileupElement> peList = new ArrayList<PileupElement>(tumorReadPile.finalPileup.depthOfCoverage());
                 for(PileupElement pe : tumorReadPile.finalPileup) {
                     peList.add(pe);
                 }
@@ -1520,7 +1517,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
         ArrayList<PileupElement> newPileupElements = new ArrayList<PileupElement>();
 
         for ( PileupElement p : pile.finalPileup ) {
-            final SAMRecord read = p.getRead();
+            final GATKSAMRecord read = p.getRead();
             final int offset = p.getOffset();
 
             int mismatchQualitySum =
