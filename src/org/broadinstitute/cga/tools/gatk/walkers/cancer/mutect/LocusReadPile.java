@@ -41,7 +41,7 @@ public class LocusReadPile {
 
         ReadBackedPileup noOverlapPileup;
         if (!retainOverlapMismatches) {
-            noOverlapPileup = pileup.getOverlappingFragmentFilteredPileup();
+            noOverlapPileup = getOverlappingFragmentFilteredPileup(pileup, (byte) refBase);
         } else {
             noOverlapPileup = getOverlappingFragmentFilteredPileupButPreferMismatches(pileup, (byte) refBase);
         }
@@ -92,14 +92,6 @@ public class LocusReadPile {
         
     }
 
-        /**
-     * Returns a new ReadBackedPileup where only one read from an overlapping read
-     * pair is retained.  If the two reads in question disagree to their basecall,
-     * neither read is retained.  If they agree on the base, the read with the higher
-     * quality observation is retained
-     *
-     * @return the newly filtered pileup
-     */
     public static ReadBackedPileup getOverlappingFragmentFilteredPileupButPreferMismatches(ReadBackedPileup rbp, byte ref) {
         Map<String,PileupElement> filteredPileup = new HashMap<String, PileupElement>();
 
@@ -126,12 +118,63 @@ public class LocusReadPile {
         }
 
 
-        ArrayList<PileupElement> filteredPileupElements = new ArrayList<PileupElement>();
+        // TODO: hacked so that we returned a RBPL constructed with a sorted list of elements.  should really be using the native fragment stuff throughout...
+        SortedSet<PileupElement> filteredPileupElements = new TreeSet<PileupElement>(new PileupElementAlignmentStartPositionComparator());
         for(PileupElement filteredElement: filteredPileup.values()) {
             filteredPileupElements.add(filteredElement);
         }
 
-        return new ReadBackedPileupImpl(rbp.getLocation(), filteredPileupElements);
+        List<PileupElement> sortedList = new ArrayList<PileupElement>(filteredPileupElements.size());
+        for(PileupElement pe : filteredPileupElements) {
+            sortedList.add(pe);
+        }
+
+        return new ReadBackedPileupImpl(rbp.getLocation(), sortedList);
+    }
+
+
+    public static ReadBackedPileup getOverlappingFragmentFilteredPileup(ReadBackedPileup rbp, byte ref) {
+        Map<String,PileupElement> filteredPileup = new HashMap<String, PileupElement>();
+
+        for ( PileupElement p : rbp ) {
+            String readName = p.getRead().getReadName();
+
+            // if we've never seen this read before, life is good
+            if (!filteredPileup.containsKey(readName)) {
+                filteredPileup.put(readName, p);
+            } else {
+                PileupElement existing = filteredPileup.get(readName);
+
+                // if the reads disagree at this position, throw them both out.  Otherwise
+                // keep the element with the higher quality score
+                if (existing.getBase() != p.getBase()) {
+                    filteredPileup.remove(readName);
+                } else {
+                    if (existing.getQual() < p.getQual()) {
+                        filteredPileup.put(readName, p);
+                    }
+                }
+            }
+        }
+
+        // TODO: hacked so that we returned a RBPL constructed with a sorted list of elements.  should really be using the native fragment stuff throughout...
+        SortedSet<PileupElement> filteredPileupElements = new TreeSet<PileupElement>(new PileupElementAlignmentStartPositionComparator());
+        for(PileupElement filteredElement: filteredPileup.values()) {
+            filteredPileupElements.add(filteredElement);
+        }
+
+        List<PileupElement> sortedList = new ArrayList<PileupElement>(filteredPileupElements.size());
+        for(PileupElement pe : filteredPileupElements) {
+            sortedList.add(pe);
+        }
+
+        return new ReadBackedPileupImpl(rbp.getLocation(), sortedList);
+    }
+
+    private static class PileupElementAlignmentStartPositionComparator implements Comparator<PileupElement>{
+        public int compare(PileupElement pe1, PileupElement pe2) {
+            if (pe1.getRead().getAlignmentStart() < pe2.getRead().getAlignmentStart()) { return -1; } else { return 1; }
+        }
     }
 
     public double estimateAlleleFraction(char ref, char alt) {
