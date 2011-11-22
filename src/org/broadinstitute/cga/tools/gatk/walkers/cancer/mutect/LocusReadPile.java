@@ -93,47 +93,14 @@ public class LocusReadPile {
     }
 
     public static ReadBackedPileup getOverlappingFragmentFilteredPileupButPreferMismatches(ReadBackedPileup rbp, byte ref) {
-        Map<String,PileupElement> filteredPileup = new HashMap<String, PileupElement>();
-
-        for ( PileupElement p : rbp ) {
-            String readName = p.getRead().getReadName();
-
-            // if we've never seen this read before, life is good
-            if (!filteredPileup.containsKey(readName)) {
-                filteredPileup.put(readName, p);
-            } else {
-                PileupElement existing = filteredPileup.get(readName);
-
-                // if the reads disagree at this position, preferentally keep the alternate
-                if (existing.getBase() != p.getBase()) {
-                    if (p.getBase() != ref) {
-                        filteredPileup.put(readName, p);
-                    }
-                } else {
-                    if (existing.getQual() < p.getQual()) {
-                        filteredPileup.put(readName, p);
-                    }
-                }
-            }
-        }
-
-
-        // TODO: hacked so that we returned a RBPL constructed with a sorted list of elements.  should really be using the native fragment stuff throughout...
-        SortedSet<PileupElement> filteredPileupElements = new TreeSet<PileupElement>(new PileupElementAlignmentStartPositionComparator());
-        for(PileupElement filteredElement: filteredPileup.values()) {
-            filteredPileupElements.add(filteredElement);
-        }
-
-        List<PileupElement> sortedList = new ArrayList<PileupElement>(filteredPileupElements.size());
-        for(PileupElement pe : filteredPileupElements) {
-            sortedList.add(pe);
-        }
-
-        return new ReadBackedPileupImpl(rbp.getLocation(), sortedList);
+        return getOverlappingFragmentFilteredPileup(rbp, ref, true);
     }
 
-
     public static ReadBackedPileup getOverlappingFragmentFilteredPileup(ReadBackedPileup rbp, byte ref) {
+        return getOverlappingFragmentFilteredPileup(rbp, ref, false);
+    }
+
+    public static ReadBackedPileup getOverlappingFragmentFilteredPileup(ReadBackedPileup rbp, byte ref, boolean retainMismatches) {
         Map<String,PileupElement> filteredPileup = new HashMap<String, PileupElement>();
 
         for ( PileupElement p : rbp ) {
@@ -145,10 +112,19 @@ public class LocusReadPile {
             } else {
                 PileupElement existing = filteredPileup.get(readName);
 
-                // if the reads disagree at this position, throw them both out.  Otherwise
-                // keep the element with the higher quality score
+                // if the reads disagree at this position...
                 if (existing.getBase() != p.getBase()) {
-                    filteredPileup.remove(readName);
+                    //... and we're not retaining mismatches, throw them both out
+                    if (!retainMismatches) {
+                        filteredPileup.remove(readName);
+
+                    //... and we are retaining mismatches, keep the mismatching one
+                    } else {
+                        if (p.getBase() != ref) {
+                            filteredPileup.put(readName, p);
+                        }
+                    }
+                // Otherwise, keep the element with the higher quality score
                 } else {
                     if (existing.getQual() < p.getQual()) {
                         filteredPileup.put(readName, p);
