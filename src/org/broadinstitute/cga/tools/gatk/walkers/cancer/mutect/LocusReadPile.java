@@ -100,48 +100,65 @@ public class LocusReadPile {
         return getOverlappingFragmentFilteredPileup(rbp, ref, false);
     }
 
-    public static ReadBackedPileup getOverlappingFragmentFilteredPileup(ReadBackedPileup rbp, byte ref, boolean retainMismatches) {
-        Map<String,PileupElement> filteredPileup = new HashMap<String, PileupElement>();
+    private static class ElementInfo {
+        public PileupElement p;
+        public Integer index;
 
+        private ElementInfo(PileupElement p, Integer index) {
+            this.p = p;
+            this.index = index;
+        }
+    }
+
+    public static ReadBackedPileup getOverlappingFragmentFilteredPileup(ReadBackedPileup rbp, byte ref, boolean retainMismatches) {
+        Map<String,Integer> filteredPileup = new HashMap<String, Integer>();
+
+        PileupElement[] listOfElements = new PileupElement[rbp.getNumberOfElements()];
+        boolean[] elementsToKeep = new boolean[rbp.getNumberOfElements()];
+        int i=0;
         for ( PileupElement p : rbp ) {
+            listOfElements[i] = p;
             String readName = p.getRead().getReadName();
 
             // if we've never seen this read before, life is good
             if (!filteredPileup.containsKey(readName)) {
-                filteredPileup.put(readName, p);
+                filteredPileup.put(readName, i);
+                elementsToKeep[i] = true;
             } else {
-                PileupElement existing = filteredPileup.get(readName);
+                int existingIndex = filteredPileup.get(readName);
+                PileupElement existing = listOfElements[existingIndex];
 
                 // if the reads disagree at this position...
                 if (existing.getBase() != p.getBase()) {
                     //... and we're not retaining mismatches, throw them both out
                     if (!retainMismatches) {
                         filteredPileup.remove(readName);
+                        elementsToKeep[existingIndex] = false;
 
                     //... and we are retaining mismatches, keep the mismatching one
                     } else {
                         if (p.getBase() != ref) {
-                            filteredPileup.put(readName, p);
+                            elementsToKeep[existingIndex] = false;
+                            filteredPileup.put(readName, i);
+                            elementsToKeep[i] = true;
                         }
                     }
                 // Otherwise, keep the element with the higher quality score
                 } else {
                     if (existing.getQual() < p.getQual()) {
-                        filteredPileup.put(readName, p);
+                        elementsToKeep[existingIndex] = false;
+                        filteredPileup.put(readName, i);
+                        elementsToKeep[i] = true;
                     }
                 }
             }
+            i++;
         }
 
-        // TODO: hacked so that we returned a RBPL constructed with a sorted list of elements.  should really be using the native fragment stuff throughout...
-        SortedSet<PileupElement> filteredPileupElements = new TreeSet<PileupElement>(new PileupElementAlignmentStartPositionComparator());
-        for(PileupElement filteredElement: filteredPileup.values()) {
-            filteredPileupElements.add(filteredElement);
-        }
-
-        List<PileupElement> sortedList = new ArrayList<PileupElement>(filteredPileupElements.size());
-        for(PileupElement pe : filteredPileupElements) {
-            sortedList.add(pe);
+        List<PileupElement> sortedList = new ArrayList<PileupElement>(rbp.getNumberOfElements());
+        for(int j=0; j<elementsToKeep.length; j++) {
+            Boolean b = elementsToKeep[j];
+            if (b != null && b == true) { sortedList.add(listOfElements[j]); }
         }
 
         return new ReadBackedPileupImpl(rbp.getLocation(), sortedList);
