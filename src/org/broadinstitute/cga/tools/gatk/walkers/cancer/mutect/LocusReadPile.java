@@ -25,7 +25,7 @@ public class LocusReadPile {
     protected ReadBackedPileup qualityScoreFilteredPileup;
     public ReadBackedPileup finalPileup;
 
-    public static final int INSERTION_EVENT_PROXIMITY = 5; // a 11bp window
+    public static final int GAP_EVENT_PROXIMITY = 5; // a 11bp window
     protected int deletionsCount = 0;
     protected int insertionsCount = 0;
 
@@ -71,12 +71,12 @@ public class LocusReadPile {
                     int eventStart = 0;
 
                     for (CigarElement ce : p.getRead().getCigar().getCigarElements()) {
-                        if (ce.getOperator() == CigarOperator.INSERTION && (Math.abs(eventStart - p.getOffset()) <= INSERTION_EVENT_PROXIMITY)) {
+                        if (ce.getOperator() == CigarOperator.INSERTION && (Math.abs(eventStart - p.getOffset()) <= GAP_EVENT_PROXIMITY)) {
                             insertionsCount++;
                             break;
                         }
 
-                        if (ce.getOperator() == CigarOperator.DELETION && (Math.abs(eventStart - p.getOffset()) <= INSERTION_EVENT_PROXIMITY)) {
+                        if (ce.getOperator() == CigarOperator.DELETION && (Math.abs(eventStart - p.getOffset()) <= GAP_EVENT_PROXIMITY)) {
                             deletionsCount++;
                             break;
                         }

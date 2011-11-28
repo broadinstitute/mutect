@@ -31,7 +31,6 @@ public class CandidateMutation {
     private String normalSampleName;
 
     private double estimatedFractionContamination;
-    private double minimumTumorAlleleFraction;
 
     private double contaminantLod;
     private int score;
@@ -518,14 +517,6 @@ public class CandidateMutation {
 
     public void setContaminantLod(double contaminantLod) {
         this.contaminantLod = contaminantLod;
-    }
-
-    public double getMinimumTumorAlleleFraction() {
-        return minimumTumorAlleleFraction;
-    }
-
-    public void setMinimumTumorAlleleFraction(double minimumTumorAlleleFraction) {
-        this.minimumTumorAlleleFraction = minimumTumorAlleleFraction;
     }
 
     public List<Integer> getTumorAltForwardOffsetsInRead() {

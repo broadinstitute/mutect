@@ -171,28 +171,23 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
     @Argument(fullName="power_constant_af", doc="Allelic fraction constant to use in power calculations", required=false)
     public double POWER_CONSTANT_AF = 0.3f;
 
+    private enum SequencingErrorModel {
+        solid(5),
+        illumina(1);
 
-    /***************************************/
-    // simulation related parameters
-    /***************************************/
-    public static final String BAM_TAG_SIMULATION_PRIMARY = "sim_primary";
-    public static final String BAM_TAG_SIMULATION_SECONDARY = "sim_secondary";
+        private int priorBaseOffset;
+        private SequencingErrorModel(int priorBaseOffset) {
+            this.priorBaseOffset = priorBaseOffset;
+        }
 
-    @Hidden
-    @Argument(fullName="simulation_normal_depth", doc="depth of primary data to shunt to normal", required=false)
-    public int SIMULATION_NORMAL_DEPTH = 20;
-
-    @Hidden
-    @Argument(fullName="simulation_fraction", doc="fraction of tumor reads to replace with secondary sample", required=false)
-    public double SIMULATION_FRACTION = 0;
-
-    @Hidden
-    @Argument(fullName="simulation_secondary_sample", doc="if supplied, only use read groups from the secondard bam for this sample id", required=false)
-    public String SIMULATION_SECONDARY_SAMPLE = null;
+        public int getPriorBaseOffset() {
+            return priorBaseOffset;
+        }
+    }
 
     @Hidden
-    @Argument(fullName="simulation_random_seed", doc="seed to random number generator for simulation", required=false)
-    public int SIMULATION_RANDOM_SEED = 6732474;
+    @Argument(fullName="sequencing_error_model", shortName="fP", required=false, doc="If provided, the error model will be forced to be the provided String. Valid options are illumina and solid (illumina works well as a generic model")
+    public SequencingErrorModel SEQ_ERROR_MODEL = SequencingErrorModel.illumina;
 
     private static final FisherExact fisher = new FisherExact(5000);
     private final FormatUtil fmt = new FormatUtil();
@@ -250,10 +245,6 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
     private Set<SAMReaderID> tumorSAMReaderIDs = new HashSet<SAMReaderID>();
 
-    private SAMReaderID simulationPrimarySAMReaderID = null;
-    private SAMReaderID simulationSecondarySAMReaderID = null;
-    private boolean isRunningSimulation = false;
-
     private int[] minimalHeaderIndicies;
 
     @Override
@@ -300,36 +291,19 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                             NORMAL_SAMPLE_NAME = "normal";
                         }
                     }
-                } else if (BAM_TAG_SIMULATION_PRIMARY.equalsIgnoreCase(tag)) {
-                    if (simulationPrimarySAMReaderID != null) {
-                        throw new RuntimeException("Only one BAM can be tagged as sim_primary");
-                    }
-                    simulationPrimarySAMReaderID = id;
-                } else if (BAM_TAG_SIMULATION_SECONDARY.equalsIgnoreCase(tag)) {
-                    if (simulationSecondarySAMReaderID != null) {
-                        throw new RuntimeException("Only one BAM can be tagged as sim_secondary");
-                    }
-                    simulationSecondarySAMReaderID = id;
                 } else {
                     throw new RuntimeException("Unknown BAM tag '" + tag + "' must be either 'tumor' or 'normal'");
                 }                
             }
         }
 
-        if (simulationPrimarySAMReaderID != null) {
-            if (hasTumorBam || hasNormalBam) {
-                throw new RuntimeException("In simulation mode, BAMs can not be tagged as 'tumor' or 'normal'");
-            }
-            isRunningSimulation = true;
-        } else {
-            if (!hasTumorBam) {
-                throw new RuntimeException("At least one BAM tagged as 'tumor' required");
-            }
+        if (!hasTumorBam) {
+            throw new RuntimeException("At least one BAM tagged as 'tumor' required");
+        }
 
-            if (!hasNormalBam) {
-                NORMAL_LOD_THRESHOLD = -1 * Float.MAX_VALUE;
-                NORMAL_DBSNP_LOD_THRESHOLD = -1 * Float.MAX_VALUE;
-            }
+        if (!hasNormalBam) {
+            NORMAL_LOD_THRESHOLD = -1 * Float.MAX_VALUE;
+            NORMAL_DBSNP_LOD_THRESHOLD = -1 * Float.MAX_VALUE;
         }
 
         this.contaminantAlternateFraction = Math.max(MINIMUM_MUTATION_CELL_FRACTION, FRACTION_CONTAMINATION);
@@ -386,7 +360,6 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
     @Override
 	public Integer map(final RefMetaDataTracker tracker, final ReferenceContext ref, final AlignmentContext rawContext) {
-        Random simulationRandom = new Random(SIMULATION_RANDOM_SEED);
         if (NOOP) return 0;
         
         TreeMap<Double, String> messageByTumorLod = new TreeMap<Double, String>();
@@ -445,72 +418,13 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 }
 
 
-                if (isRunningSimulation) {
-                    // the simulation excludes MAPQ0 reads
-                    if (read.getMappingQuality() == 0) { continue; }
-
-                    SAMReaderID id = getToolkit().getReaderIDForRead(read);
-                    if (simulationPrimarySAMReaderID.equals(id)) {
-                        primaryPileup.add(new PileupElement(read, p.getOffset()));
-                    }
-
-                    if (simulationSecondarySAMReaderID != null && simulationSecondarySAMReaderID.equals(id)) {
-                        if (SIMULATION_SECONDARY_SAMPLE != null) {
-                            if (read.getReadGroup().getSample().equals(SIMULATION_SECONDARY_SAMPLE)) {
-                                secondaryPileup.add(new PileupElement(read, p.getOffset()));
-                            }
-                        } else {
-                            secondaryPileup.add(new PileupElement(read, p.getOffset()));
-                        }
-                    }
-
-
-
+                // Add the read to the appropriate pile of reads
+                if (isTumorRead(p.getRead())) {
+                    tumorPileupElements.add(p);
                 } else {
-                    // Add the read to the appropriate pile of reads
-                    if (isTumorRead(p.getRead())) {
-                        tumorPileupElements.add(p);
-                    } else {
-                        normalPileupElements.add(p);
-                    }
+                    normalPileupElements.add(p);
                 }
             }
-
-
-            // are we in simulation mode?
-            if (isRunningSimulation) {
-                // randomly pick SIMULATION_NORMAL_DEPTH reads (without replacement) to put into normal
-                for (int i=0; i<SIMULATION_NORMAL_DEPTH && primaryPileup.size() > 0; i++) {
-                    int chosenIndex = simulationRandom.nextInt(primaryPileup.size());
-                    normalPileupElements.add(primaryPileup.remove(chosenIndex));
-                }
-
-                // the rest go to the tumor
-
-                // calculate how many reads we need from the secondary pile
-                int primaryDepth = primaryPileup.size();
-                int secondaryDepth = secondaryPileup.size();
-                int replacementDepth = (int) Math.floor((double) primaryDepth * SIMULATION_FRACTION);
-
-                // if we don't, put zero reads in the simulated tumor
-                if (replacementDepth <= secondaryDepth) {
-                    // first take the secondary reads
-                    for(int i=0; i<replacementDepth; i++) {
-                        int chosenIndex = simulationRandom.nextInt(secondaryPileup.size());
-                        tumorPileupElements.add(secondaryPileup.remove(chosenIndex));
-                    }
-
-                    // and now take the primary reads
-                    for(int i=0; i<primaryDepth - replacementDepth; i++) {
-                        int chosenIndex = simulationRandom.nextInt(primaryPileup.size());
-                        tumorPileupElements.add(primaryPileup.remove(chosenIndex));
-                    }
-                }
-
-                primaryPileup.clear(); // for GC purposes
-                secondaryPileup.clear();
-            }
-
 
             ReadBackedPileup normalPileup =
                     new ReadBackedPileupImpl(rawContext.getLocation(), normalPileupElements);
@@ -712,11 +626,11 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
 
                 if (containsPosition(ref.getWindow(), candidate.getLocation().getStart() - 1)) {
-                    priorBasePositiveDirection = (char) ref.getBases()[(int)candidate.getLocation().getStart() - 1 - (int)ref.getWindow().getStart()];
+                    priorBasePositiveDirection = (char) ref.getBases()[(int)candidate.getLocation().getStart() - SEQ_ERROR_MODEL.getPriorBaseOffset() - (int)ref.getWindow().getStart()];
                 }
 
                 if (containsPosition(ref.getWindow(), candidate.getLocation().getStart() + 1)) {
-                    priorBaseNegativeDirection = (char) ref.getBases()[(int)candidate.getLocation().getStart() + 1 - (int)ref.getWindow().getStart()];
+                    priorBaseNegativeDirection = (char) ref.getBases()[(int)candidate.getLocation().getStart() + SEQ_ERROR_MODEL.getPriorBaseOffset() - (int)ref.getWindow().getStart()];
                 }
 
                 candidate.setPriorBasePositiveDirection(priorBasePositiveDirection);
@@ -1064,10 +978,6 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             candidate.addRejectionReason("nearby_gap_events");
         }
 
-        if (candidate.getTumorF() < candidate.getMinimumTumorAlleleFraction()) {
-            candidate.addRejectionReason("minimum_tumor_f");
-        }
-
         if (FRACTION_CONTAMINATION+MINIMUM_MUTATION_CELL_FRACTION > 0 && candidate.getTumorLodFStar() <= TUMOR_LOD_THRESHOLD + Math.max(0, candidate.getContaminantLod())) {
             candidate.addRejectionReason("possible_contamination");
         }
@@ -1240,7 +1150,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                         format(candidate.getTumorF()),
                         format(FRACTION_CONTAMINATION),
                         format(candidate.getContaminantLod()),
-                        format(candidate.getMinimumTumorAlleleFraction()),
+                        format("n/a"),
                         format(candidate.getTumorQ20Count()),
                         format(candidate.getInitialTumorRefCounts()),
                         format(candidate.getInitialTumorAltCounts()),
@@ -1538,9 +1448,16 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 continue;
             }
 
+            // is this a heavily clipped read?
             if (isReadHeavilyClipped(read)) {
                 continue;
             }
+
+            // was this read ONLY placed because it's mate was uniquely placed? (supplied by BWA)
+            if ("M".equals(read.getAttribute("XT"))) {
+                continue;
+            }
+
 
             // if we're here... we passed all the read filters!
             newPileupElements.add(new PileupElement(read, p.getOffset()));
