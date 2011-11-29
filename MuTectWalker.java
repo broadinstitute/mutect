@@ -171,7 +171,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
     @Argument(fullName="power_constant_af", doc="Allelic fraction constant to use in power calculations", required=false)
     public double POWER_CONSTANT_AF = 0.3f;
 
-    private enum SequencingErrorModel {
+    public enum SequencingErrorModel {
         solid(5),
         illumina(1);
 
