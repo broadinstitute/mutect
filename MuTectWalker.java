@@ -1432,6 +1432,8 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 //    }
 
     int MAX_READ_MISMATCH_QUALITY_SCORE_SUM = 100;
+    // TODO: make this parameterizable
+    private static Character MAPPED_BY_MATE = 'M';
     private LocusReadPile filterReads(final ReferenceContext ref, final LocusReadPile pile, final char altAllele, final String reference, final long leftmostIndex) {
         ArrayList<PileupElement> newPileupElements = new ArrayList<PileupElement>();
 
@@ -1454,11 +1456,9 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             }
 
             // was this read ONLY placed because it's mate was uniquely placed? (supplied by BWA)
-            if ("M".equals(read.getAttribute("XT"))) {
+            if (MAPPED_BY_MATE.equals(read.getAttribute("XT"))) {
                 continue;
             }
-
-
             // if we're here... we passed all the read filters!
             newPileupElements.add(new PileupElement(read, p.getOffset()));
 
