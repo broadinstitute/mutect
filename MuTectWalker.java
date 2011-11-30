@@ -65,6 +65,10 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
     @Argument(fullName = "artifact_detection_mode", required = false, doc="used when running the caller on a normal (as if it were a tumor) to detect artifacts")
     public boolean ARTIFACT_DETECTION_MODE = false;
 
+    @Hidden
+    @Argument(fullName = "no_baq", required = false, doc="disable use of BAQ to rescore base qualities")
+    public boolean NO_BAQ = false;
+
     @Argument(fullName = "tumor_sample_name", required = false, doc="name to use for tumor in output files")
     public String TUMOR_SAMPLE_NAME = null;
 
@@ -629,7 +633,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setPriorBaseNegativeDirection(priorBaseNegativeDirection);
 
                 // TODO: make this parameterizable
-                final LocusReadPile t2 = filterReads(ref, tumorReadPile, true, true);
+                final LocusReadPile t2 = filterReads(ref, tumorReadPile, true, !NO_BAQ);
 
                 // if there are no reads remaining, abandon this theory
                 if ( !FORCE_OUTPUT && t2.finalPileupReads.size() == 0) { continue; }
