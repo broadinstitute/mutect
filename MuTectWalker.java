@@ -3,6 +3,7 @@ package org.broadinstitute.cga.tools.gatk.walkers.cancer.mutect;
 import java.io.*;
 import java.util.*;
 
+import net.sf.picard.reference.IndexedFastaSequenceFile;
 import net.sf.picard.util.FormatUtil;
 import net.sf.samtools.*;
 import net.sf.samtools.util.StringUtil;
@@ -18,6 +19,7 @@ import org.broadinstitute.sting.gatk.refdata.RefMetaDataTracker;
 import org.broadinstitute.sting.gatk.walkers.*;
 import org.broadinstitute.sting.gatk.walkers.genotyper.DiploidGenotype;
 import org.broadinstitute.sting.utils.GenomeLoc;
+import org.broadinstitute.sting.utils.baq.BAQ;
 import org.broadinstitute.sting.utils.pileup.ReadBackedPileup;
 import org.broadinstitute.sting.utils.pileup.PileupElement;
 import org.broadinstitute.sting.utils.pileup.ReadBackedPileupImpl;
@@ -26,6 +28,7 @@ import org.broadinstitute.sting.utils.sam.GATKSAMRecord;
 import org.broadinstitute.sting.utils.variantcontext.VariantContext;
 
 @PartitionBy(PartitionType.INTERVAL)
+@BAQMode()
 @Reference(window=@Window(start=-1* MuTectWalker.REFERENCE_HALF_WINDOW_LENGTH,stop= MuTectWalker.REFERENCE_HALF_WINDOW_LENGTH))
 @By(DataSource.REFERENCE)
 public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeReducible<Integer> {
@@ -254,6 +257,8 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 	public void initialize() {
         if (NOOP) { return; }
 
+        refReader = this.getToolkit().getReferenceDataSource().getReference();
+
         // check that we have at least one tumor bam
         for(SAMReaderID id : getToolkit().getReadsDataSource().getReaderIDs()) {
             if (id.getTags().getPositionalTags().size() == 0) {
@@ -398,8 +403,6 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
             int totalPairs = 0;
             int improperPairs = 0;
-            List<PileupElement> primaryPileup = new ArrayList<PileupElement>(pileup.depthOfCoverage());
-            List<PileupElement> secondaryPileup = new ArrayList<PileupElement>(pileup.depthOfCoverage());
             for (PileupElement p : pileup ) {
                 final GATKSAMRecord read = p.getRead();
                 final byte base = p.getBase();
@@ -584,17 +587,6 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 double contaminantLod = refHetHom[1] - refHetHom[0];
                 candidate.setContaminantLod(contaminantLod);
 
-//                // perform rank-sum test on distribution of quality scores
-//                // for tumor reference allele and alternate allele
-//                int[] refQuals = convertToSortedArray(tumorReadPile.getQualityScores(upRef));
-//                int[] altQuals = convertToSortedArray(tumorReadPile.getQualityScores(altAllele));
-//
-//                // only works if we have both ref and alt alleles (e.g. not hnref case!)
-//                if (refQuals.length > 0 && altQuals.length > 0) {
-//                    candidate.setTumorQualityRankSumTest(getRankSumTest().test(refQuals, altQuals));
-//                }
-//
-
 
                 // (ii) the quality score sum for the mutant base in the normal must be < 50 and the
                 //      LOD score for ref:ref vs mutant:ref + mutant:mutant must be at least 2.3.
@@ -636,7 +628,8 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setPriorBasePositiveDirection(priorBasePositiveDirection);
                 candidate.setPriorBaseNegativeDirection(priorBaseNegativeDirection);
 
-                final LocusReadPile t2 = filterReads(ref, tumorReadPile, altAllele, refGATKString, refStart);
+                // TODO: make this parameterizable
+                final LocusReadPile t2 = filterReads(ref, tumorReadPile, true, true);
 
                 // if there are no reads remaining, abandon this theory
                 if ( !FORCE_OUTPUT && t2.finalPileupReads.size() == 0) { continue; }
@@ -688,7 +681,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 ReadBackedPileup referencePileup =
                         new ReadBackedPileupImpl(rawContext.getLocation(), referencePileupElements);
 
-                // FIXME: shouldn't this be refAllele here?
+                // TODO: shouldn't this be refAllele here?
                 final LocusReadPile mutantPile = new LocusReadPile(mutantPileup, altAllele, 0, 0);
                 final LocusReadPile refPile =  new LocusReadPile(referencePileup, altAllele, 0, 0);
 
@@ -753,23 +746,6 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
     private boolean containsPosition(GenomeLoc window, int position) {
         return (window.getStart() <= position && position <= window.getStop());
-    }
-
-    // FIXME: there must be a better way to do this...
-    private int[] convertToSortedArray(List inputList) {
-        Collections.sort(inputList);
-        int[] output = new int[inputList.size()];
-        for(int i=0; i< inputList.size(); i++) {
-            Object o = inputList.get(i);
-            if (o instanceof Integer) {
-                output[i] = (Integer) o;
-            } else if (o instanceof Byte) {
-                output[i] = ((Byte) o).intValue();
-            } else {
-                throw new RuntimeException("Unknown value for RST");
-            }
-        }
-        return output;
     }
 
     public static class FisherData {
@@ -936,7 +912,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
     private List<Integer> getOffsetsInRead(ReadBackedPileup p, boolean useForwardOffsets) {
         List<Integer> positions = new ArrayList<Integer>();
         for(PileupElement pe : p) {
-            // FIXME: maybe we should be doing start-site distribution, or a clipping aware offset?
+            // TODO: maybe we should be doing start-site distribution, or a clipping aware offset?
                 positions.add(
                         Math.abs((int)(p.getLocation().getStart() - (useForwardOffsets?pe.getRead().getAlignmentStart():pe.getRead().getAlignmentEnd())))
                 );
@@ -1291,7 +1267,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 //    private Map<Integer, Double> performClassicMisalignmentTest(final LocusReadPile refPile, final LocusReadPile mutantPile, final String contig, final long position, final String reference, final long leftmostIndex, final int minQScore) {
 //        final Map<Integer, Double> skewLodOffsets = new TreeMap<Integer, Double>();
 //
-//        //fixme: calculate this range properly
+//        //TODO: calculate this range properly
 //        int MAX_OFFSET_DISTANCE = 60;
 //
 //        for(int offset=-1 * MAX_OFFSET_DISTANCE; offset<MAX_OFFSET_DISTANCE; offset++) {
@@ -1318,7 +1294,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 //            final double skewLod = Math.log10( (1-J) / J);
 //
 //
-//            // FIXME!: get rid of bases with quality score < min Qscore (add parameter to getLocusBases)
+//            // TODO!: get rid of bases with quality score < min Qscore (add parameter to getLocusBases)
 //            List<Byte> mutantAlleles = mutantPile.getLocusBases(offset);
 //            List<Byte> otherAlleles = refPile.getLocusBases(offset);
 //
@@ -1343,7 +1319,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 //                                                               final int minQScore) {
 //        final Map<Integer, Double> skewLodOffsets = new TreeMap<Integer, Double>();
 //
-//        //fixme: calculate this range properly
+//        //TODO: calculate this range properly
 //        int MAX_OFFSET_DISTANCE = 60;
 //
 //        for(int offset=-1 * MAX_OFFSET_DISTANCE; offset<MAX_OFFSET_DISTANCE; offset++) {
@@ -1361,7 +1337,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 //            if (offset >= -1 && offset <= 1 ) { continue; }
 //
 //
-//            // FIXME!: get rid of bases with quality score < min Qscore (add parameter to getLocusBases)
+//            // TODO!: get rid of bases with quality score < min Qscore (add parameter to getLocusBases)
 //            List<Byte> mutantAlleles = mutantPile.getLocusBases(offset);
 //            List<Byte> otherAlleles = refPile.getLocusBases(offset);
 //
@@ -1432,14 +1408,16 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 //    }
 
     int MAX_READ_MISMATCH_QUALITY_SCORE_SUM = 100;
-    // TODO: make this parameterizable
     private static Character MAPPED_BY_MATE = 'M';
-    private LocusReadPile filterReads(final ReferenceContext ref, final LocusReadPile pile, final char altAllele, final String reference, final long leftmostIndex) {
+    private BAQ baqHMM = new BAQ();
+    // TODO: or should we be using this? baqHMM = new BAQ(1e-3, 0.1, bw, (byte)0, true); from the BAQ unit test?
+    IndexedFastaSequenceFile refReader;
+
+    private LocusReadPile filterReads(final ReferenceContext ref, final LocusReadPile pile, boolean filterMateRescueReads, boolean applyBAQ) {
         ArrayList<PileupElement> newPileupElements = new ArrayList<PileupElement>();
 
         for ( PileupElement p : pile.finalPileup ) {
             final GATKSAMRecord read = p.getRead();
-            final int offset = p.getOffset();
 
             int mismatchQualitySum =
                     AlignmentUtils.mismatchesInRefWindow(p, ref, false, true);
@@ -1456,9 +1434,15 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             }
 
             // was this read ONLY placed because it's mate was uniquely placed? (supplied by BWA)
-            if (MAPPED_BY_MATE.equals(read.getAttribute("XT"))) {
+            if (filterMateRescueReads && MAPPED_BY_MATE.equals(read.getAttribute("XT"))) {
                 continue;
             }
+
+            // apply BAQ
+            if (applyBAQ) {
+                baqHMM.baqRead(read, refReader, BAQ.CalculationMode.RECALCULATE, BAQ.QualityMode.OVERWRITE_QUALS);
+            }
+
             // if we're here... we passed all the read filters!
             newPileupElements.add(new PileupElement(read, p.getOffset()));
 
@@ -1567,7 +1551,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             switch ( ce.getOperator() ) {
                 case M:
                     for (int j = 0 ; j < ce.getLength() ; j++, refIndex++, readIndex++ ) {
-                        // FIXME: what is this case????
+                        // TODO: what is this case????
                         if ( refIndex >= refSeq.length() ) {
                             sum += MAX_QUAL;
                         } else {
