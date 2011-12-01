@@ -4,9 +4,7 @@ import java.io.*;
 import java.util.*;
 
 import net.sf.picard.reference.IndexedFastaSequenceFile;
-import net.sf.picard.util.FormatUtil;
 import net.sf.samtools.*;
-import net.sf.samtools.util.StringUtil;
 
 import org.apache.commons.math.MathException;
 import org.apache.commons.math.distribution.BinomialDistribution;
@@ -32,7 +30,6 @@ import org.broadinstitute.sting.utils.variantcontext.VariantContext;
 @Reference(window=@Window(start=-1* MuTectWalker.REFERENCE_HALF_WINDOW_LENGTH,stop= MuTectWalker.REFERENCE_HALF_WINDOW_LENGTH))
 @By(DataSource.REFERENCE)
 public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeReducible<Integer> {
-    private static final String TAB = "\t";
     public static final int REFERENCE_HALF_WINDOW_LENGTH = 150;
     public static final String BAM_TAG_TUMOR = "tumor";
     public static final String BAM_TAG_NORMAL = "normal";
@@ -65,9 +62,9 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
     @Argument(fullName = "artifact_detection_mode", required = false, doc="used when running the caller on a normal (as if it were a tumor) to detect artifacts")
     public boolean ARTIFACT_DETECTION_MODE = false;
 
-    @Hidden
-    @Argument(fullName = "no_baq", required = false, doc="disable use of BAQ to rescore base qualities")
-    public boolean NO_BAQ = false;
+//    @Hidden
+//    @Argument(fullName = "no_baq", required = false, doc="disable use of BAQ to rescore base qualities")
+    public boolean NO_BAQ = true;
 
     @Argument(fullName = "tumor_sample_name", required = false, doc="name to use for tumor in output files")
     public String TUMOR_SAMPLE_NAME = null;
@@ -100,8 +97,17 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             doc = "minimum fraction of cells which are presumed to have a mutation, used to handle non-clonality and contamination")
     public float MINIMUM_MUTATION_CELL_FRACTION = 0.00f;
 
-    @Argument(fullName = "normal_lod", required = false, doc = "LOD threshold for calling normal non-variant")
+    @Argument(fullName = "normal_lod", required = false, doc = "LOD threshold for calling normal non-germline")
     public float NORMAL_LOD_THRESHOLD = 2.3f;
+
+    @Hidden
+    @Argument(fullName = "normal_artifact_lod", required = false, doc = "LOD threshold for calling normal non-variant")
+    public float NORMAL_ARTIFACT_LOD_THRESHOLD = 2.0f;
+
+    @Hidden
+    @Argument(fullName = "strand_artifact_lod", required = false, doc = "LOD threshold for calling strand bias")
+    public float STRAND_ARTIFACT_LOD_THRESHOLD = 2.0f;
+
 
     @Argument(fullName = "dbsnp_normal_lod", required = false, doc = "LOD threshold for calling normal non-variant at dbsnp sites")
     public float NORMAL_DBSNP_LOD_THRESHOLD = 5.3f;
@@ -125,9 +131,6 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
     @Argument(fullName = "clipping_bias_pvalue_threshold", required = false, doc = "pvalue threshold for fishers exact test of clipping bias in mutant reads vs ref reads")
     public float CLIPPING_BIAS_PVALUE_THRESHOLD = 0.05f;
-
-    @Argument(fullName = "min_mutant_sum_pretest", required = false, doc="pretest -- require sum of alt allele quality score to be >= this")
-    public int MIN_MUTANT_SUM_PRETEST = 60;
 
     @Argument(fullName = "fraction_mapq0_threshold", required = false, doc = "threshold for determining if there is relatedness between the alt and ref allele read piles")
     public float FRACTION_MAPQ0_THRESHOLD = 0.5f;
@@ -197,7 +200,6 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
     public SequencingErrorModel SEQ_ERROR_MODEL = SequencingErrorModel.illumina;
 
     private static final FisherExact fisher = new FisherExact(5000);
-    private final FormatUtil fmt = new FormatUtil();
 
     private boolean hasTumorBam = false;
     private boolean hasNormalBam = false;
@@ -208,6 +210,8 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
     private TumorPowerCalculator tumorPowerCalculator;
     private NormalPowerCalculator normalNovelSitePowerCalculator;
     private NormalPowerCalculator normalDbSNPSitePowerCalculator;
+    private TumorPowerCalculator normalArtifactPowerCalculator;
+    private TumorPowerCalculator strandArtifactPowerCalculator;
 
     private static class ThreadLocalRankSumTest extends ThreadLocal<RankSumTest> {
         public RankSumTest initialValue() {
@@ -252,7 +256,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
     private Set<SAMReaderID> tumorSAMReaderIDs = new HashSet<SAMReaderID>();
 
-    private int[] minimalHeaderIndicies;
+    private CallStatsGenerator callStatsGenerator;
 
     @Override
     public boolean includeReadsWithDeletionAtLoci() { return true; }
@@ -262,6 +266,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
         if (NOOP) { return; }
 
         refReader = this.getToolkit().getReferenceDataSource().getReference();
+        callStatsGenerator = new CallStatsGenerator(ENABLE_EXTENDED_OUTPUT);
 
         // check that we have at least one tumor bam
         for(SAMReaderID id : getToolkit().getReadsDataSource().getReaderIDs()) {
@@ -323,6 +328,8 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
         this.tumorPowerCalculator = new TumorPowerCalculator(this.powerConstantEps, TUMOR_LOD_THRESHOLD, this.contaminantAlternateFraction);
         this.normalNovelSitePowerCalculator = new NormalPowerCalculator(this.powerConstantEps, NORMAL_LOD_THRESHOLD);
         this.normalDbSNPSitePowerCalculator = new NormalPowerCalculator(this.powerConstantEps, NORMAL_DBSNP_LOD_THRESHOLD);
+        this.normalArtifactPowerCalculator = new TumorPowerCalculator(this.powerConstantEps, NORMAL_ARTIFACT_LOD_THRESHOLD, 0.0f);
+        this.strandArtifactPowerCalculator = new TumorPowerCalculator(this.powerConstantEps, STRAND_ARTIFACT_LOD_THRESHOLD, 0.0f);
 
         stdCovWriter = new CoverageWiggleFileWriter(COVERAGE_FILE);
         q20CovWriter = new CoverageWiggleFileWriter(COVERAGE_20_Q20_FILE);
@@ -337,26 +344,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
         // write out the call stats header
         out.println("## muTector v1.0." + VERSION.split(" ")[1]);
-        String header;
-        if (ENABLE_EXTENDED_OUTPUT) {
-            header = StringUtil.join(TAB, COMPLETE_CALL_STATS_HEADER);
-        } else {
-            header = StringUtil.join(TAB, MINIMAL_CALL_STATS_HEADER);
-
-            // initialize the indicies of the reduced headers from the full headers
-            minimalHeaderIndicies = new int[MINIMAL_CALL_STATS_HEADER.length];
-            for(int i=0; i<MINIMAL_CALL_STATS_HEADER.length; i++) {
-                String column = MINIMAL_CALL_STATS_HEADER[i];
-
-                for(int j=0; j<COMPLETE_CALL_STATS_HEADER.length; j++) {
-                    if (COMPLETE_CALL_STATS_HEADER[j].equals(column)) {
-                        minimalHeaderIndicies[i] = j;
-                    }
-                }
-            }
-
-        }
-        out.println(header);
+        out.println(callStatsGenerator.generateHeader());
 
         lastTime = System.currentTimeMillis();
     }
@@ -523,7 +511,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setTotalPairs(totalPairs);
                 candidate.setImproperPairs(improperPairs);
                 candidate.setMapQ0Reads(mapQ0Reads);
-                candidate.setEstimatedFractionContamination(FRACTION_CONTAMINATION);
+                candidate.setContaminationFraction(FRACTION_CONTAMINATION);
                 candidate.setPanelOfNormalsVC(panelOfNormalsVC.isEmpty()?null:panelOfNormalsVC.iterator().next());
                 candidate.setCosmicSite(!cosmicVC.isEmpty());
                 candidate.setDbsnpSite(knownDbSnpSite);
@@ -559,6 +547,9 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 } else {
                     continue;
                 }
+
+                // calculate power to have detected this artifact in the normal
+                candidate.setNormalArtifactPower(this.normalArtifactPowerCalculator.cachingPowerCalculation(normalBaseCount, candidate.getTumorF()));
 
                 // calculate lod of contaminant
                 double contaminantF = Math.min(contaminantAlternateFraction, candidate.getTumorF());
@@ -604,6 +595,11 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setNormalF(normalF);
                 VariableAllelicRatioGenotypeLikelihoods normalFStarGl = normalReadPile.calculateLikelihoods(normalF, normalReadPile.qualityScoreFilteredPileup);
                 candidate.setNormalLodFStar(normalReadPile.getRefVsHet(normalFStarGl, upRef, altAllele));
+
+
+
+                VariableAllelicRatioGenotypeLikelihoods normalArtifactGl = normalReadPile.calculateLikelihoods(candidate.getTumorF(), normalReadPile.qualityScoreFilteredPileup);
+                candidate.setNormalArtifactLod(normalReadPile.getAltVsRef(normalArtifactGl, upRef, altAllele));
 
                 candidate.setInitialNormalAltQualitySum(normQs.getQualitySum(altAllele));
                 candidate.setInitialNormalRefQualitySum(normQs.getQualitySum(upRef));
@@ -652,6 +648,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setTumorLodFStar(tumorReadPile.getHetVsRef(tumorFStarGl2, upRef, altAllele));
                 candidate.setTumorF(f2);
 
+                //TODO: shouldn't this be f2 in the lod calculation instead of the strand specific f values?
                 ReadBackedPileup forwardPileup = t2.finalPileup.getPositiveStrandPileup();
                 double f2forward = LocusReadPile.estimateAlleleFraction(forwardPileup, upRef, altAllele);
                 VariableAllelicRatioGenotypeLikelihoods tumorFStarGl2Forward = t2.calculateLikelihoods(f2forward, forwardPileup);
@@ -661,6 +658,16 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 double f2reverse = LocusReadPile.estimateAlleleFraction(reversePileup, upRef, altAllele);
                 VariableAllelicRatioGenotypeLikelihoods tumorFStarGl2Reverse = t2.calculateLikelihoods(f2reverse, reversePileup);
                 candidate.setTumorLodFStarReverse(tumorReadPile.getHetVsRef(tumorFStarGl2Reverse, upRef, altAllele));
+
+
+                // calculate strand bias power
+                candidate.setPowerToDetectPositiveStrandArtifact(
+                        strandArtifactPowerCalculator.cachingPowerCalculation(reversePileup.depthOfCoverage(), candidate.getTumorF())
+                );
+                candidate.setPowerToDetectNegativeStrandArtifact(
+                        strandArtifactPowerCalculator.cachingPowerCalculation(forwardPileup.depthOfCoverage(), candidate.getTumorF())
+                );
+
 
                 ArrayList<PileupElement> mutantPileupElements = new ArrayList<PileupElement>();
                 ArrayList<PileupElement> referencePileupElements = new ArrayList<PileupElement>();
@@ -698,6 +705,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setTumorAltReverseOffsetsInRead(getReverseOffsetsInRead(mutantPileup));
 
 
+
 //                candidate.setClassicSkewScoresAndOffsets(
 //                    performClassicMisalignmentTest(refPile, mutantPile, rawContext.getContig(), rawContext.getPosition(), refGATKString, refStart, MIN_QSCORE)
 //                );
@@ -728,10 +736,11 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 // test to see if the candidate should be rejected
                 performRejection(candidate);
 
+                String csOutput = callStatsGenerator.generateCallStats(candidate);
                 if (FORCE_ALLELES) {
-                    out.println(generateCallStats(candidate));
+                    out.println(csOutput);
                 } else {
-                    messageByTumorLod.put(candidate.getInitialTumorLod(), generateCallStats(candidate));
+                    messageByTumorLod.put(candidate.getInitialTumorLod(), csOutput);
                 }
             }
 
@@ -940,10 +949,6 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             return;
         }
 
-        if (candidate.getInitialTumorAltQualitySum() < MIN_MUTANT_SUM_PRETEST) {
-            candidate.addRejectionReason("min_mutant_sum_pretest");
-        }
-
         // if the best theory for the normal is A het (not necessarily this het)
         // just move on.  We're not attempting to call LOH with this tool
         if (candidate.getInitialNormalBestGenotype() != DiploidGenotype.AA &&
@@ -1017,184 +1022,6 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
         }
     }
 
-    private Integer getKeyForSmallestValue(Map<Integer, Double> map) {
-        Integer key = null;
-        Double smallest = null;
-        for (Map.Entry<Integer, Double> e : map.entrySet()) {
-            if (smallest == null || e.getValue() < smallest) {
-                key = e.getKey();
-                smallest = e.getValue();
-            }
-        }
-        return key;
-    }
-
-    private Integer getKeyForLargestValue(Map<Integer, Double> map) {
-        Integer key = null;
-        Double largest = null;
-        for (Map.Entry<Integer, Double> e : map.entrySet()) {
-            if (largest == null || e.getValue() > largest) {
-                key = e.getKey();
-                largest = e.getValue();
-            }
-        }
-        return key;
-    }
-
-    private static final String[] COMPLETE_CALL_STATS_HEADER =
-            new String[]{
-                "contig","position","ref_allele","alt_allele","tumor_name","normal_name","score","dbsnp_site",
-                "covered", "power", "tumor_power", "normal_power",
-                "total_pairs","improper_pairs","map_Q0_reads",
-                "init_t_lod","t_lod_fstar","t_lod_fstar_forward", "t_lod_fstar_reverse", "tumor_f","contaminant_fraction","contaminant_lod","minimum_tumor_f", "t_q20_count", "t_ref_count","t_alt_count","t_ref_sum","t_alt_sum","t_ins_count","t_del_count",
-                "normal_best_gt","init_n_lod","n_lod_fstar","normal_f","n_q20_count", "n_ref_count","n_alt_count","n_ref_sum","n_alt_sum",
-                "at_risk_positive_direction_artifact", "at_risk_negative_direction_artifact", "powered_positive_direction_artifact", "powered_negative_direction_artifact",
-                "perfect_strand_bias","strand_bias_counts","strand_bias",
-                "classic_max_skew_lod", "classic_max_skew_lod_offset", "fisher_min_skew_pvalue", "fisher_min_skew_pvalue_offset",
-                "tumor_qsrst_ms", "tumor_qsrst_pval", "tumor_rprst_ms", "tumor_rprst_pval",
-                "tumor_alt_fpir_median", "tumor_alt_fpir_mad","tumor_alt_rpir_median","tumor_alt_rpir_mad","alt_fpir","alt_rpir",
-                "powered_filters", "observed_in_normals_count", "failure_reasons","judgement"
-            };
-
-    private static final String[] MINIMAL_CALL_STATS_HEADER =
-            new String[]{
-                "contig","position","ref_allele","alt_allele","tumor_name","normal_name","score","dbsnp_site",
-                "covered", "power", "tumor_power", "normal_power",
-                "total_pairs","improper_pairs","map_Q0_reads",
-                "t_lod_fstar","tumor_f","contaminant_fraction","contaminant_lod",
-                "t_ref_count","t_alt_count","t_ref_sum","t_alt_sum","t_ins_count","t_del_count",
-                "normal_best_gt","init_n_lod", "n_ref_count","n_alt_count","n_ref_sum","n_alt_sum",
-                "judgement"
-            };
-
-    private String generateCallStats(CandidateMutation candidate) {
-        RankSumTest.Result qrst = candidate.getTumorQualityRankSumTest();
-        RankSumTest.Result prst = candidate.getTumorReadPositionRankSumTest();
-
-        Double classicSkewScore = null;
-        Integer classicSkewOffset = null;
-        Map<Integer, Double> classicSkewInfo = candidate.getClassicSkewScoresAndOffsets();
-        if (classicSkewInfo != null && classicSkewInfo.size() > 0) {
-            classicSkewOffset = getKeyForLargestValue(classicSkewInfo);
-            classicSkewScore = classicSkewInfo.get(classicSkewOffset);
-            if (classicSkewScore == Double.POSITIVE_INFINITY) {
-                classicSkewScore = 999999d;
-            } else if (classicSkewScore == Double.NEGATIVE_INFINITY) {
-                classicSkewScore = -999999d;
-            }
-
-        }
-
-        Double fisherSkewScore = null;
-        Integer fisherSkewOffset = null;
-        Map<Integer, Double> fisherSkewInfo = candidate.getFisherSkewScoresAndOffsets();
-        if (fisherSkewInfo != null && fisherSkewInfo.size() > 0) {
-            fisherSkewOffset = getKeyForSmallestValue(fisherSkewInfo);
-            fisherSkewScore = fisherSkewInfo.get(fisherSkewOffset);
-        }
-
-        // further classify KEEP to indicate KEEP-CLASSIC for classic LOD
-        String keepString = "REJECT";
-        if (!candidate.isRejected()) {
-            keepString = "KEEP";
-        }
-
-        String siteInfo = "NOVEL";
-        if (candidate.isDbsnpSite()) {
-            siteInfo = "DBSNP";
-        }
-        if (candidate.isCosmicSite()) {
-            siteInfo = "COSMIC";
-        }
-
-        String[] msg = new String[] {
-                        candidate.getLocation().getContig(),
-                        format(candidate.getLocation().getStart()),
-                        ""+candidate.getRefAllele(),
-                        ""+candidate.getAltAllele(),
-                        candidate.getTumorSampleName(),
-                        candidate.getNormalSampleName(),
-                        format(candidate.getScore()),
-                        siteInfo,
-                        (candidate.isCovered()?"COVERED":"UNCOVERED"),
-                        format(candidate.getPower()),
-                        format(candidate.getTumorPower()),
-                        format(candidate.getNormalPower()),
-                        format(candidate.getTotalPairs()),
-                        format(candidate.getImproperPairs()),
-                        format(candidate.getMapQ0Reads()),
-                        format(candidate.getInitialTumorLod()),
-                        format(candidate.getTumorLodFStar()),
-                        format(candidate.getTumorLodFStarForward()),
-                        format(candidate.getTumorLodFStarReverse()),
-                        format(candidate.getTumorF()),
-                        format(FRACTION_CONTAMINATION),
-                        format(candidate.getContaminantLod()),
-                        format("n/a"),
-                        format(candidate.getTumorQ20Count()),
-                        format(candidate.getInitialTumorRefCounts()),
-                        format(candidate.getInitialTumorAltCounts()),
-                        format(candidate.getInitialTumorRefQualitySum()),
-                        format(candidate.getInitialTumorAltQualitySum()),
-                        format(candidate.getTumorInsertionCount()),
-                        format(candidate.getTumorDeletionCount()),
-                        format(candidate.getInitialNormalBestGenotype().toString()),
-                        format(candidate.getInitialNormalLod()),
-                        format(candidate.getNormalLodFStar()),
-                        format(candidate.getNormalF()),
-                        format(candidate.getNormalQ20Count()),
-                        format(candidate.getInitialNormalRefCounts()),
-                        format(candidate.getInitialNormalAltCounts()),
-                        format(candidate.getInitialNormalRefQualitySum()),
-                        format(candidate.getInitialNormalAltQualitySum()),
-                        format(candidate.isPositiveDirectionAtRisk()?1:0),
-                        format(candidate.isNegativeDirectionAtRisk()?1:0),
-                        format(candidate.isPositiveDirectionPowered()?1:0),
-                        format(candidate.isNegativeDirectionPowered()?1:0),
-                        format(candidate.getPerfectStrandBias().getP()),
-                        format(candidate.getStrandBias().dataToString()),
-                        format(candidate.getStrandBias().getP()),
-                        format(classicSkewScore),
-                        format(classicSkewOffset),
-                        format(fisherSkewScore),
-                        format(fisherSkewOffset),
-                        qrst==null?"n/a":format(candidate.getTumorQualityRankSumTest().getMedianShift()),
-                        qrst==null?"n/a":format(candidate.getTumorQualityRankSumTest().getP()),
-                        prst==null?"n/a":format(candidate.getTumorReadPositionRankSumTest().getMedianShift()),
-                        prst==null?"n/a":format(candidate.getTumorReadPositionRankSumTest().getP()),
-                        candidate.getTumorForwardOffsetsInReadMedian()==null?"n/a":format(candidate.getTumorForwardOffsetsInReadMedian()),
-                        candidate.getTumorForwardOffsetsInReadMad()==null?"n/a":format(candidate.getTumorForwardOffsetsInReadMad()),
-                        candidate.getTumorReverseOffsetsInReadMedian()==null?"n/a":format(candidate.getTumorReverseOffsetsInReadMedian()),
-                        candidate.getTumorReverseOffsetsInReadMad()==null?"n/a":format(candidate.getTumorReverseOffsetsInReadMad()),
-                        (candidate.getTumorAltForwardOffsetsInRead().size() > 500 ? "too_many":StringUtil.join(",", toString(candidate.getTumorAltForwardOffsetsInRead()))),
-                        (candidate.getTumorAltReverseOffsetsInRead().size() > 500 ? "too_many":StringUtil.join(",", toString(candidate.getTumorAltReverseOffsetsInRead()))),
-                        StringUtil.join(",", candidate.getPoweredFilters().toArray(new String[]{})),
-                        format(candidate.getCountOfNormalsObservedIn()),
-                        StringUtil.join(",", candidate.getRejectionReasons().toArray(new String[]{})),
-                        keepString
-            };
-
-        if (ENABLE_EXTENDED_OUTPUT) {
-            return StringUtil.join(TAB, msg);
-        } else {
-            List<String> output = new ArrayList<String>();
-            for(int index : minimalHeaderIndicies) {
-                output.add(msg[index]);
-            }
-            return StringUtil.join(TAB, output.toArray(new String[]{}));
-        }
-    }
-
-    private String format(String s) { return s; }
-    private String format(Integer i) { return fmt.format(i); }
-    private String format(Float f) { return format((double)f);}
-    private String format(Double d) {
-        if (d == null) { return "n/a"; }
-
-        String s = fmt.format(d);
-        return ("-0".equals(s))?"0":s;
-    }
-
     private double calculateMAD(double[] dd, double median) {
         double[] dev = new double[dd.length];
         for(int i=0; i<dd.length; i++) {
@@ -1238,14 +1065,6 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
         return ret;
     }
 
-    private String[] toString(List<Integer> ints) {
-        String[] out = new String[ints.size()];
-        for(int i=0; i<ints.size(); i++) {
-            out[i] = ints.get(i).toString();
-        }
-        return out;
-    }
-
     public Integer treeReduce(Integer lhs, Integer rhs) {
         return 0;
     }
@@ -1260,156 +1079,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
         return 0;
     }
 
-    @Override
-    public void onTraversalDone(final Integer result) {
-//        quietClose(this.mafWriter);
-//        quietClose(this.coverageWriter);
-    }
 
-    // TODO: commented out since it has to be upgraded to handle fragment based calling, but if we no longer use this test then yay! :)
-
-//    private Map<Integer, Double> performClassicMisalignmentTest(final LocusReadPile refPile, final LocusReadPile mutantPile, final String contig, final long position, final String reference, final long leftmostIndex, final int minQScore) {
-//        final Map<Integer, Double> skewLodOffsets = new TreeMap<Integer, Double>();
-//
-//        //TODO: calculate this range properly
-//        int MAX_OFFSET_DISTANCE = 60;
-//
-//        for(int offset=-1 * MAX_OFFSET_DISTANCE; offset<MAX_OFFSET_DISTANCE; offset++) {
-//            // what is the reference at this position?
-//            long refOffset = position - leftmostIndex + offset;
-//
-//            // cap it at the ends of the provided reference sequence also!
-//            if (refOffset < 0 || refOffset >= reference.length()) { continue; }
-//
-//            // if this is a dbsnp site... exclude it also
-//            if (isDbsnpSite(contig, (int)position + offset)) { continue; }
-//
-//            // allow for doubletons
-//            if (offset >= -1 && offset <= 1 ) { continue; }
-//
-//            final int SKEW_QSCORE_THRESHOLD = 10;
-//            final double[] mutantNormProbs = mutantPile.getNormalizedProbs(offset, SKEW_QSCORE_THRESHOLD);
-//            final double[] otherNormProbs = refPile.getNormalizedProbs(offset, SKEW_QSCORE_THRESHOLD);
-//
-//            double J = 0;
-//            for(int i=0; i<10; i++) {
-//                J += mutantNormProbs[i] * otherNormProbs[i];
-//            }
-//            final double skewLod = Math.log10( (1-J) / J);
-//
-//
-//            // TODO!: get rid of bases with quality score < min Qscore (add parameter to getLocusBases)
-//            List<Byte> mutantAlleles = mutantPile.getLocusBases(offset);
-//            List<Byte> otherAlleles = refPile.getLocusBases(offset);
-//
-//            final int mutantReadCounts = mutantAlleles.size();
-//            final int otherReadCounts = otherAlleles.size();
-//
-//            if (mutantReadCounts >= 2 && otherReadCounts >= 2) {
-//                skewLodOffsets.put(offset, skewLod);
-//            }
-//        }
-//
-//        return skewLodOffsets;
-//
-//    }
-
-//    private Map<Integer, Double> performFisherMisalignmentTest(final LocusReadPile refPile,
-//                                                               final LocusReadPile mutantPile,
-//                                                               final String contig,
-//                                                               final long position,
-//                                                               final String reference,
-//                                                               final long leftmostIndex,
-//                                                               final int minQScore) {
-//        final Map<Integer, Double> skewLodOffsets = new TreeMap<Integer, Double>();
-//
-//        //TODO: calculate this range properly
-//        int MAX_OFFSET_DISTANCE = 60;
-//
-//        for(int offset=-1 * MAX_OFFSET_DISTANCE; offset<MAX_OFFSET_DISTANCE; offset++) {
-//
-//            // what is the reference at this position?
-//            long offsetIntoReferenceString = position - leftmostIndex + offset;
-//
-//            // cap it at the ends of the provided reference sequence also!
-//            if (offsetIntoReferenceString < 0 || offsetIntoReferenceString >= reference.length()) { continue; }
-//
-//            // if this is a dbsnp site... exclude it also
-//            if (isDbsnpSite(contig, (int) position + offset)) { continue; }
-//
-//            // allow for doubletons
-//            if (offset >= -1 && offset <= 1 ) { continue; }
-//
-//
-//            // TODO!: get rid of bases with quality score < min Qscore (add parameter to getLocusBases)
-//            List<Byte> mutantAlleles = mutantPile.getLocusBases(offset);
-//            List<Byte> otherAlleles = refPile.getLocusBases(offset);
-//
-//            // determine the two most common alleles at the offset
-//            TreeMap<Byte, Integer> counts = new TreeMap<Byte, Integer>();
-//            counts.put((byte)'A',0);
-//            counts.put((byte)'C',0);
-//            counts.put((byte)'G',0);
-//            counts.put((byte)'T',0);
-//            for (byte base : otherAlleles) {
-//                counts.put(base, (counts.containsKey(base)?counts.get(base):0) + 1);
-//            }
-//            for (byte base : mutantAlleles) {
-//                counts.put(base, (counts.containsKey(base)?counts.get(base):0) + 1);
-//            }
-//
-//            LinkedHashMap sortedCounts = (LinkedHashMap<Byte, Integer>) sortByDescendingValue(counts);
-//            Iterator<Byte> it = sortedCounts.keySet().iterator();
-//            byte altAllele1 = it.next();
-//            byte altAllele2 = it.next();
-//
-//
-//
-//            // Construct a 2x2 contingency table of
-//            //               OFFSET-ALT1   OFFSET-ALT2
-//            //    REF-READS      a             b
-//            //    MUT-READS      c             d
-//            int a = 0, b = 0, c = 0, d = 0;
-//            for (byte base : otherAlleles) {
-//                if (base == altAllele1) {
-//                    a++;
-//                } else if (base == altAllele2) {
-//                    b++;
-//                }
-//            }
-//            for (byte base : mutantAlleles) {
-//                if (base == altAllele1) {
-//                    c++;
-//                } else if (base == altAllele2) {
-//                    d++;
-//                }
-//            }
-//
-//            // calculate the maximum p-value we could get
-//            //               OFFSET-ALT1   OFFSET-ALT2
-//            //    REF-READS      a+b           0
-//            //    MUT-READS       0           c+d
-//            final double mostSignificantP = fisher.getTwoTailedP(a+b,0,0,c+d);
-//
-//            if (mostSignificantP < SKEW_FISHER_PVALUE_CUTOFF) {
-//                final double p = fisher.getTwoTailedP(a,b,c,d);
-//                skewLodOffsets.put(offset, p);
-////                System.out.println( "Offset: " + offset + " msp: " + mostSignificantP + " (a,b,c,d): (" + a + "," + b + "," + c + "," + d + ") p: "+ p);
-//            }
-//
-//        }
-//
-//        // perform Bonferroni Correction
-//        int n = skewLodOffsets.size();
-//        //System.out.println("Bonferroni n:"+n);
-//        for(Integer offset : skewLodOffsets.keySet()) {
-//            double p = skewLodOffsets.get(offset);
-//            skewLodOffsets.put(offset, p * n);
-//        }
-//
-//        return skewLodOffsets;
-//
-//    }
 
     int MAX_READ_MISMATCH_QUALITY_SCORE_SUM = 100;
     private static Character MAPPED_BY_MATE = 'M';
@@ -1510,17 +1180,9 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
         }
     }
 
-    private int mismatchQualitySum(final SAMRecord read, final String refSeq, final int refIndex) {
-        return mismatchQualitySum(read, refSeq, refIndex, 0);
-    }
-
     private int mismatchQualitySum(final SAMRecord read, final String refSeq, final int refIndex, final int minMismatchQualityScore) {
         final List<Mismatch> mismatches = getMismatches(read, refSeq, refIndex);
         return mismatchQualitySum(mismatches, minMismatchQualityScore);
-    }
-
-    private int mismatchQualitySum(final List<Mismatch> mismatches) {
-        return mismatchQualitySum(mismatches, 0);
     }
 
     private int mismatchQualitySum(final List<Mismatch> mismatches, final int minMismatchQualityScore) {

@@ -30,7 +30,7 @@ public class CandidateMutation {
     private String tumorSampleName;
     private String normalSampleName;
 
-    private double estimatedFractionContamination;
+    private double contaminationFraction;
 
     private double contaminantLod;
     private int score;
@@ -65,10 +65,16 @@ public class CandidateMutation {
     private double normalF;
     private double normalLodFStar;
 
+    private double normalArtifactPower;
+    private double normalArtifactLod;
+
     private RankSumTest.Result tumorQualityRankSumTest;
     private RankSumTest.Result tumorReadPositionRankSumTest;
     private Map<Integer, Double> classicSkewScoresAndOffsets;
     private Map<Integer, Double> fisherSkewScoresAndOffsets;
+
+    private double powerToDetectPositiveStrandArtifact;
+    private double powerToDetectNegativeStrandArtifact;
 
     private MuTectWalker.FisherData strandBias;
     private MuTectWalker.FisherData perfectStrandBias;
@@ -503,12 +509,12 @@ public class CandidateMutation {
         this.mapQ0Reads = mapQ0Reads;
     }
 
-    public double getEstimatedFractionContamination() {
-        return estimatedFractionContamination;
+    public double getContaminationFraction() {
+        return contaminationFraction;
     }
 
-    public void setEstimatedFractionContamination(double estimatedFractionContamination) {
-        this.estimatedFractionContamination = estimatedFractionContamination;
+    public void setContaminationFraction(double contaminationFraction) {
+        this.contaminationFraction = contaminationFraction;
     }
 
     public double getContaminantLod() {
@@ -626,5 +632,37 @@ public class CandidateMutation {
 
     public void setPanelOfNormalsVC(VariantContext panelOfNormalsVC) {
         this.panelOfNormalsVC = panelOfNormalsVC;
+    }
+
+    public double getNormalArtifactPower() {
+        return normalArtifactPower;
+    }
+
+    public void setNormalArtifactPower(double normalArtifactPower) {
+        this.normalArtifactPower = normalArtifactPower;
+    }
+
+    public double getNormalArtifactLod() {
+        return normalArtifactLod;
+    }
+
+    public void setNormalArtifactLod(double normalArtifactLod) {
+        this.normalArtifactLod = normalArtifactLod;
+    }
+
+    public double getPowerToDetectPositiveStrandArtifact() {
+        return powerToDetectPositiveStrandArtifact;
+    }
+
+    public void setPowerToDetectPositiveStrandArtifact(double powerToDetectPositiveStrandArtifact) {
+        this.powerToDetectPositiveStrandArtifact = powerToDetectPositiveStrandArtifact;
+    }
+
+    public double getPowerToDetectNegativeStrandArtifact() {
+        return powerToDetectNegativeStrandArtifact;
+    }
+
+    public void setPowerToDetectNegativeStrandArtifact(double powerToDetectNegativeStrandArtifact) {
+        this.powerToDetectNegativeStrandArtifact = powerToDetectNegativeStrandArtifact;
     }
 }
