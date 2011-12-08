@@ -16,8 +16,10 @@ import org.broadinstitute.sting.gatk.datasources.reads.SAMReaderID;
 import org.broadinstitute.sting.gatk.refdata.RefMetaDataTracker;
 import org.broadinstitute.sting.gatk.walkers.*;
 import org.broadinstitute.sting.gatk.walkers.genotyper.DiploidGenotype;
+import org.broadinstitute.sting.utils.BaseUtils;
 import org.broadinstitute.sting.utils.GenomeLoc;
 import org.broadinstitute.sting.utils.baq.BAQ;
+import org.broadinstitute.sting.utils.exceptions.UserException;
 import org.broadinstitute.sting.utils.pileup.ReadBackedPileup;
 import org.broadinstitute.sting.utils.pileup.PileupElement;
 import org.broadinstitute.sting.utils.pileup.ReadBackedPileupImpl;
@@ -157,19 +159,19 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
     /***************************************/
     // coverage related parameters
     /***************************************/
-    @Argument(fullName="coverage_file", shortName="cov", doc="write out coverage in WIGGLE format to this file", required=false)
+    @Output(fullName="coverage_file", shortName="cov", doc="write out coverage in WIGGLE format to this file", required=false)
     public PrintStream COVERAGE_FILE = null;
 
-    @Argument(fullName="coverage_20_q20_file", shortName="cov_q20", doc="write out 20x of Q20 coverage in WIGGLE format to this file", required=false)
+    @Output(fullName="coverage_20_q20_file", shortName="cov_q20", doc="write out 20x of Q20 coverage in WIGGLE format to this file", required=false)
     public PrintStream COVERAGE_20_Q20_FILE = null;
 
-    @Argument(fullName="power_file", shortName="pow", doc="write out power in WIGGLE format to this file", required=false)
+    @Output(fullName="power_file", shortName="pow", doc="write out power in WIGGLE format to this file", required=false)
     public PrintStream POWER_FILE = null;
 
-    @Argument(fullName="tumor_depth_file", shortName="tdf", doc="write out tumor read depth in WIGGLE format to this file", required=false)
+    @Output(fullName="tumor_depth_file", shortName="tdf", doc="write out tumor read depth in WIGGLE format to this file", required=false)
     public PrintStream TUMOR_DEPTH_FILE = null;
 
-    @Argument(fullName="normal_depth_file", shortName="ndf", doc="write out normal read depth in WIGGLE format to this file", required=false)
+    @Output(fullName="normal_depth_file", shortName="ndf", doc="write out normal read depth in WIGGLE format to this file", required=false)
     public PrintStream NORMAL_DEPTH_FILE = null;
 
     @Argument(fullName="power_constant_qscore", doc="Phred scale quality score constant to use in power calculations", required=false)
@@ -576,7 +578,10 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                     }
 
                     // TODO: when fragment-based calling is fully enabled in VARGL, this needs to change!
-                    contaminantLikelihoods.add(base, pe.getQual());
+                    // ignore bad bases, cap at mapping quality, and effectively have no threshold on quality (80) since this was done in our pileup
+                    // TODO: remove this local copy of qualToUse once we can just use the real thing!
+                    // TODO: move to this                           contaminantLikelihoods.add(base, qualToUse(pe, true, true, 80));
+                    contaminantLikelihoods.add(base, qualToUse(pe, false, false, 80));
                 }
                 double[] refHetHom = LocusReadPile.extractRefHetHom(contaminantLikelihoods, upRef, altAllele);
                 double contaminantLod = refHetHom[1] - refHetHom[0];
@@ -755,6 +760,33 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             
             throw new RuntimeException(t);
         }
+    }
+
+    /**
+     * Helper function that returns the phred-scaled base quality score we should use for calculating
+     * likelihoods for a pileup element.  May return 0 to indicate that the observation is bad, and may
+     * cap the quality score by the mapping quality of the read itself.
+     *
+     * @param p
+     * @param ignoreBadBases
+     * @param capBaseQualsAtMappingQual
+     * @param minBaseQual
+     * @return
+     */
+    private static byte qualToUse(PileupElement p, boolean ignoreBadBases, boolean capBaseQualsAtMappingQual, int minBaseQual) {
+        if ( ignoreBadBases && !BaseUtils.isRegularBase(p.getBase()) )
+            return 0;
+
+        byte qual = p.getQual();
+
+        if ( qual > SAMUtils.MAX_PHRED_SCORE )
+            throw new UserException.MalformedBAM(p.getRead(), String.format("the maximum allowed quality score is %d, but a quality of %d was observed in read %s.  Perhaps your BAM incorrectly encodes the quality scores in Sanger format; see http://en.wikipedia.org/wiki/FASTQ_format for more details", SAMUtils.MAX_PHRED_SCORE, qual, p.getRead().getReadName()));
+        if ( capBaseQualsAtMappingQual )
+            qual = (byte)Math.min((int)p.getQual(), p.getMappingQual());
+        if ( (int)qual < minBaseQual )
+            qual = (byte)0;
+
+        return qual;
     }
 
     private boolean containsPosition(GenomeLoc window, int position) {

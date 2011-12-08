@@ -189,6 +189,7 @@ public class LocusReadPile {
     public VariableAllelicRatioGenotypeLikelihoods calculateLikelihoods(double alpha, ReadBackedPileup pileup) {
         VariableAllelicRatioGenotypeLikelihoods likelihoods
                 = new VariableAllelicRatioGenotypeLikelihoods(refBase, alpha);
+//TODO: move to this        likelihoods.add(pileup, true, true, this.minQualityScore);
         likelihoods.add(pileup, false, false, this.minQualityScore);
         return likelihoods;
     }
@@ -214,27 +215,6 @@ public class LocusReadPile {
         }
         return bases;
     }
-
-//    public List<Byte> getLocusQuals(int locusOffset) {
-//        List<Byte> quals = new ArrayList<Byte>(finalPileup.getReads().size());
-//
-//        for(int i=0; i<finalPileup.getReads().size(); i++) {
-//            SAMRecord read = finalPileup.getReads().get(i);
-//            int readOffset = finalPileup.getOffsets().get(i);
-//
-//            int offset = readOffset + locusOffset;
-//            if (offset >= 0 && offset < read.getReadString().length()) {
-//                quals.add(read.getBaseQualities()[offset]);
-//            }
-//        }
-//        return quals;
-//    }
-//
-
-    public List<Byte> getQualityScores(char allele) {
-        return getQualityScores(0, allele);
-    }
-
     public List<Byte> getQualityScores(int locusOffset, char allele) {
         List<Byte> scores = new ArrayList<Byte>();
 
