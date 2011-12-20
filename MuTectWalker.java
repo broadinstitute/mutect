@@ -323,6 +323,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
         if (!hasNormalBam) {
             NORMAL_LOD_THRESHOLD = -1 * Float.MAX_VALUE;
             NORMAL_DBSNP_LOD_THRESHOLD = -1 * Float.MAX_VALUE;
+            NORMAL_ARTIFACT_LOD_THRESHOLD = Float.MAX_VALUE;
         }
 
         this.contaminantAlternateFraction = Math.max(MINIMUM_MUTATION_CELL_FRACTION, FRACTION_CONTAMINATION);
