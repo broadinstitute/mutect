@@ -39,19 +39,15 @@ public class LocusReadPile {
         this.minQSumQualityScore = minQSumQualityScore;
         this.minQualityScore = minQualityScore;
 
-//        ReadBackedPileup noOverlapPileup;
-//        if (!retainOverlapMismatches) {
-//            noOverlapPileup = getOverlappingFragmentFilteredPileup(pileup, (byte) refBase);
-//        } else {
-//            noOverlapPileup = getOverlappingFragmentFilteredPileupButPreferMismatches(pileup, (byte) refBase);
-//        }
-//        this.initialPileup = noOverlapPileup.getPileupWithoutDeletions();
-//        this.qualityScoreFilteredPileup = initialPileup.getBaseFilteredPileup(minQualityScore);
-//        this.finalPileup = qualityScoreFilteredPileup.getPileupWithoutMappingQualityZeroReads();
-ReadBackedPileup noOverlapPileup = pileup;
-this.initialPileup = pileup;
-this.qualityScoreFilteredPileup = pileup;
-this.finalPileup =pileup;
+        ReadBackedPileup noOverlapPileup;
+        if (!retainOverlapMismatches) {
+            noOverlapPileup = getOverlappingFragmentFilteredPileup(pileup, (byte) refBase);
+        } else {
+            noOverlapPileup = getOverlappingFragmentFilteredPileupButPreferMismatches(pileup, (byte) refBase);
+        }
+        this.initialPileup = noOverlapPileup.getPileupWithoutDeletions();
+        this.qualityScoreFilteredPileup = initialPileup.getBaseFilteredPileup(minQualityScore);
+        this.finalPileup = qualityScoreFilteredPileup.getPileupWithoutMappingQualityZeroReads();
 
         for (PileupElement p : qualityScoreFilteredPileup) {
             if (p.getMappingQual() == 0 && !allowMapq0ForQualSum) { continue; }
