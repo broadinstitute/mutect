@@ -39,16 +39,19 @@ public class LocusReadPile {
         this.minQSumQualityScore = minQSumQualityScore;
         this.minQualityScore = minQualityScore;
 
-        ReadBackedPileup noOverlapPileup;
-        if (!retainOverlapMismatches) {
-            noOverlapPileup = getOverlappingFragmentFilteredPileup(pileup, (byte) refBase);
-        } else {
-            noOverlapPileup = getOverlappingFragmentFilteredPileupButPreferMismatches(pileup, (byte) refBase);
-        }
-        this.initialPileup = noOverlapPileup.getPileupWithoutDeletions();
-        this.qualityScoreFilteredPileup = initialPileup.getBaseFilteredPileup(minQualityScore);
-        this.finalPileup = qualityScoreFilteredPileup.getPileupWithoutMappingQualityZeroReads();
-
+//        ReadBackedPileup noOverlapPileup;
+//        if (!retainOverlapMismatches) {
+//            noOverlapPileup = getOverlappingFragmentFilteredPileup(pileup, (byte) refBase);
+//        } else {
+//            noOverlapPileup = getOverlappingFragmentFilteredPileupButPreferMismatches(pileup, (byte) refBase);
+//        }
+//        this.initialPileup = noOverlapPileup.getPileupWithoutDeletions();
+//        this.qualityScoreFilteredPileup = initialPileup.getBaseFilteredPileup(minQualityScore);
+//        this.finalPileup = qualityScoreFilteredPileup.getPileupWithoutMappingQualityZeroReads();
+ReadBackedPileup noOverlapPileup = pileup;
+this.initialPileup = pileup;
+this.qualityScoreFilteredPileup = pileup;
+this.finalPileup =pileup;
 
         for (PileupElement p : qualityScoreFilteredPileup) {
             if (p.getMappingQual() == 0 && !allowMapq0ForQualSum) { continue; }
@@ -190,7 +193,13 @@ public class LocusReadPile {
         VariableAllelicRatioGenotypeLikelihoods likelihoods
                 = new VariableAllelicRatioGenotypeLikelihoods(refBase, alpha);
 //TODO: move to this        likelihoods.add(pileup, true, true, this.minQualityScore);
-        likelihoods.add(pileup, false, false, this.minQualityScore);
+
+        // we have to do this rather than pass in the ReadBackedPileup because that call
+        // attempts to make Fragments out of these, which doesn't work if you have
+        // a single pileup with multiple samples (as we do in the simulation)
+        for(PileupElement pe : pileup) {
+            likelihoods.add(pe, false, false, this.minQualityScore);
+        }
         return likelihoods;
     }
 
