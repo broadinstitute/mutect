@@ -104,12 +104,15 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
     @Hidden
     @Argument(fullName = "normal_artifact_lod", required = false, doc = "LOD threshold for calling normal non-variant")
-    public float NORMAL_ARTIFACT_LOD_THRESHOLD = 2.0f;
+    public float NORMAL_ARTIFACT_LOD_THRESHOLD = 0.0f;
 
     @Hidden
     @Argument(fullName = "strand_artifact_lod", required = false, doc = "LOD threshold for calling strand bias")
     public float STRAND_ARTIFACT_LOD_THRESHOLD = 2.0f;
 
+    @Hidden
+    @Argument(fullName = "strand_artifact_power_threshold", required = false, doc = "power threshold for calling strand bias")
+    public float STRAND_ARTIFACT_POWER_THRESHOLD = 0.9f;
 
     @Argument(fullName = "dbsnp_normal_lod", required = false, doc = "LOD threshold for calling normal non-variant at dbsnp sites")
     public float NORMAL_DBSNP_LOD_THRESHOLD = 5.3f;
@@ -580,8 +583,8 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                     // TODO: when fragment-based calling is fully enabled in VARGL, this needs to change!
                     // ignore bad bases, cap at mapping quality, and effectively have no threshold on quality (80) since this was done in our pileup
                     // TODO: remove this local copy of qualToUse once we can just use the real thing!
-                    // TODO: move to this                           contaminantLikelihoods.add(base, qualToUse(pe, true, true, 80));
-                    contaminantLikelihoods.add(base, qualToUse(pe, false, false, 80));
+                    // TODO: move to this                           contaminantLikelihoods.add(base, qualToUse(pe, true, true, 0));
+                    contaminantLikelihoods.add(base, qualToUse(pe, false, false, 0));
                 }
                 double[] refHetHom = LocusReadPile.extractRefHetHom(contaminantLikelihoods, upRef, altAllele);
                 double contaminantLod = refHetHom[1] - refHetHom[0];
@@ -1007,8 +1010,12 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             candidate.addRejectionReason("normal_lod");
         }
 
-        if ( (candidate.getInitialNormalAltCounts() >= MAX_ALT_ALLELES_IN_NORMAL_COUNT && candidate.getInitialNormalAltQualitySum() > MAX_ALT_ALLELES_IN_NORMAL_QSCORE_SUM && candidate.getNormalF() > MAX_ALT_ALLELE_IN_NORMAL_FRACTION)) {
-            candidate.addRejectionReason("alt allele in normal");
+//        if ( (candidate.getInitialNormalAltCounts() >= MAX_ALT_ALLELES_IN_NORMAL_COUNT && candidate.getInitialNormalAltQualitySum() > MAX_ALT_ALLELES_IN_NORMAL_QSCORE_SUM && candidate.getNormalF() > MAX_ALT_ALLELE_IN_NORMAL_FRACTION)) {
+//            candidate.addRejectionReason("alt allele in normal");
+//        }
+
+        if (candidate.getNormalArtifactLod() > NORMAL_ARTIFACT_LOD_THRESHOLD) {
+            candidate.addRejectionReason("normal_artifact_lod");
         }
 
         if ( (candidate.getTumorForwardOffsetsInReadMedian() != null && candidate.getTumorForwardOffsetsInReadMedian() <= PIR_MEDIAN_THRESHOLD && candidate.getTumorForwardOffsetsInReadMad() != null && candidate.getTumorForwardOffsetsInReadMad() <= PIR_MAD_THRESHOLD) ||
@@ -1036,12 +1043,20 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
         // TODO: sync naming (is it positive or forward)?
         // test both the positive and negative direction.  If you're "at risk" for an artifact in a direction you need
         // to observerve a LOD score > than the threshold in the OPPOSITE direction
-        if (candidate.isPositiveDirectionAtRisk() && candidate.isPositiveDirectionPowered() && candidate.getTumorLodFStarReverse() < 2.0) {
-            candidate.addRejectionReason("positive_strand_artifact");
+//        if (candidate.isPositiveDirectionAtRisk() && candidate.isPositiveDirectionPowered() && candidate.getTumorLodFStarReverse() < 2.0) {
+//            candidate.addRejectionReason("positive_strand_artifact");
+//        }
+//
+//        if (candidate.isNegativeDirectionAtRisk() && candidate.isNegativeDirectionPowered() && candidate.getTumorLodFStarForward() < 2.0) {
+//            candidate.addRejectionReason("negative_strand_artifact");
+//        }
+
+        if (candidate.getPowerToDetectNegativeStrandArtifact() >= STRAND_ARTIFACT_POWER_THRESHOLD && candidate.getTumorLodFStarForward() < STRAND_ARTIFACT_LOD_THRESHOLD) {
+            candidate.addRejectionReason("strand_artifact");
         }
 
-        if (candidate.isNegativeDirectionAtRisk() && candidate.isNegativeDirectionPowered() && candidate.getTumorLodFStarForward() < 2.0) {
-            candidate.addRejectionReason("negative_strand_artifact");
+        if (candidate.getPowerToDetectPositiveStrandArtifact() >= STRAND_ARTIFACT_POWER_THRESHOLD && candidate.getTumorLodFStarReverse() < STRAND_ARTIFACT_LOD_THRESHOLD) {
+            candidate.addRejectionReason("strand_artifact");
         }
 
         if (candidate.getTotalPairs() > 0 && ((float)candidate.getMapQ0Reads() / (float)candidate.getTotalPairs()) >= FRACTION_MAPQ0_THRESHOLD) {
