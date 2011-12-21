@@ -85,8 +85,17 @@ public class NormalPowerCalculator extends AbstractPowerCalculator {
             return 0;
         }
 
-        double x = 1d - (lodThreshold - lod[k-1]) / (lod[k] - lod[k-1]);
-        double power = x*p[k-1];
+        double power = 0;
+
+        // here we correct for the fact that the exact lod threshold is likely somewhere between
+        // the k and k-1 bin, so we prorate the power from that bin
+        // the k and k-1 bin, so we prorate the power from that bin
+        // if k==0, it must be that lodThreshold == lod[k] so we don't have to make this correction
+        if ( k > 0 ) {
+            double x = 1d - (lodThreshold - lod[k-1]) / (lod[k] - lod[k-1]);
+            power = x*p[k-1];
+        }
+
         for(int i=k; i<p.length; i++) {
             power += p[i];
         }
