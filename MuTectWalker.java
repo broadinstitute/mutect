@@ -31,7 +31,7 @@ import org.broadinstitute.sting.utils.variantcontext.VariantContext;
 @BAQMode()
 @Reference(window=@Window(start=-1* MuTectWalker.REFERENCE_HALF_WINDOW_LENGTH,stop= MuTectWalker.REFERENCE_HALF_WINDOW_LENGTH))
 @By(DataSource.REFERENCE)
-public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeReducible<Integer> {
+public class MuTectWalker extends LocusWalker<Integer, Integer> {
     public static final int REFERENCE_HALF_WINDOW_LENGTH = 150;
     public static final String BAM_TAG_TUMOR = "tumor";
     public static final String BAM_TAG_NORMAL = "normal";

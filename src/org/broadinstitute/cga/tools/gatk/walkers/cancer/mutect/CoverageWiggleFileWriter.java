@@ -34,9 +34,6 @@ public class CoverageWiggleFileWriter {
     private void safePrint(String s) {
         if (hasPrintStream()) {
             ps.print(s);
-
-            // flush eagerly to avoid GATK multithreading problems
-            ps.flush();
         }
     }
 
