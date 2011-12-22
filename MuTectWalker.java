@@ -27,7 +27,7 @@ import org.broadinstitute.sting.utils.sam.AlignmentUtils;
 import org.broadinstitute.sting.utils.sam.GATKSAMRecord;
 import org.broadinstitute.sting.utils.variantcontext.VariantContext;
 
-@PartitionBy(PartitionType.INTERVAL)
+@PartitionBy(PartitionType.LOCUS)
 @BAQMode()
 @Reference(window=@Window(start=-1* MuTectWalker.REFERENCE_HALF_WINDOW_LENGTH,stop= MuTectWalker.REFERENCE_HALF_WINDOW_LENGTH))
 @By(DataSource.REFERENCE)
