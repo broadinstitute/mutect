@@ -28,7 +28,7 @@ import org.broadinstitute.sting.utils.sam.GATKSAMRecord;
 import org.broadinstitute.sting.utils.variantcontext.VariantContext;
 
 @PartitionBy(PartitionType.LOCUS)
-@BAQMode()
+@BAQMode(ApplicationTime = BAQ.ApplicationTime.HANDLED_IN_WALKER, QualityMode = BAQ.QualityMode.OVERWRITE_QUALS)
 @Reference(window=@Window(start=-1* MuTectWalker.REFERENCE_HALF_WINDOW_LENGTH,stop= MuTectWalker.REFERENCE_HALF_WINDOW_LENGTH))
 @By(DataSource.REFERENCE)
 public class MuTectWalker extends LocusWalker<Integer, Integer> {
