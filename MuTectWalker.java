@@ -64,6 +64,9 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> {
     @Argument(fullName = "artifact_detection_mode", required = false, doc="used when running the caller on a normal (as if it were a tumor) to detect artifacts")
     public boolean ARTIFACT_DETECTION_MODE = false;
 
+    @Argument(fullName = "keep_only", required = false, doc="only output passing calls")
+    public boolean KEEP_ONLY = false;
+
 //    @Hidden
 //    @Argument(fullName = "no_baq", required = false, doc="disable use of BAQ to rescore base qualities")
     public boolean NO_BAQ = true;
@@ -745,11 +748,15 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> {
                 // test to see if the candidate should be rejected
                 performRejection(candidate);
 
-                String csOutput = callStatsGenerator.generateCallStats(candidate);
-                if (FORCE_ALLELES) {
-                    out.println(csOutput);
+                if (KEEP_ONLY && candidate.getRejectionReasons().size() > 0) {
+                    // if we are only outputting successful sites...
                 } else {
-                    messageByTumorLod.put(candidate.getInitialTumorLod(), csOutput);
+                    String csOutput = callStatsGenerator.generateCallStats(candidate);
+                    if (FORCE_ALLELES) {
+                        out.println(csOutput);
+                    } else {
+                        messageByTumorLod.put(candidate.getInitialTumorLod(), csOutput);
+                    }
                 }
             }
 
