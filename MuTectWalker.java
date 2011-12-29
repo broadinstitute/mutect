@@ -53,8 +53,13 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> {
     @Input(fullName="normal_panel", shortName = "normal_panel", doc="VCF file of sites observed in normal", required=false)
     public RodBinding<VariantContext> normalPanelRod;
 
-    @Argument(fullName = "noop", required = false, doc="used for debugging, basically exit as soon as we get the reads")
+    @Hidden
+    @Argument(fullName = "noop", required = false, doc="used for debugging, skip the initialize and map methods")
     public boolean NOOP = false;
+
+    @Hidden
+    @Argument(fullName = "nomap", required = false, doc="used for debugging, perform initialize but no map operations")
+    public boolean NOMAP = false;
 
     @Hidden
     @Argument(fullName = "enable_extended_output", required = false, doc="add many additional columns of statistics to the output file")
@@ -366,7 +371,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> {
 
     @Override
 	public Integer map(final RefMetaDataTracker tracker, final ReferenceContext ref, final AlignmentContext rawContext) {
-        if (NOOP) return 0;
+        if (NOOP || NOMAP) return 0;
         
         TreeMap<Double, String> messageByTumorLod = new TreeMap<Double, String>();
 
