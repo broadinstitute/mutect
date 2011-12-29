@@ -359,15 +359,9 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> {
         // write out the call stats header
         out.println("## muTector v1.0." + VERSION.split(" ")[1]);
         out.println(callStatsGenerator.generateHeader());
-
-        lastTime = System.currentTimeMillis();
     }
 
     public static int MAX_INSERT_SIZE = 10000;
-    private int totalReadsProcessed = 0;
-    private int binReadsProcessed = 0;
-    private long lastTime;
-    private int candidatesInspected = 0;
 
     @Override
 	public Integer map(final RefMetaDataTracker tracker, final ReferenceContext ref, final AlignmentContext rawContext) {
@@ -377,19 +371,6 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> {
 
         ReadBackedPileup pileup = rawContext.getBasePileup();
         int numberOfReads = pileup.depthOfCoverage();
-        binReadsProcessed += numberOfReads;
-
-        if (binReadsProcessed >= 1000000) {
-            long time = System.currentTimeMillis();
-            long elapsedTime = time - lastTime;
-            lastTime = time;
-
-            totalReadsProcessed += binReadsProcessed;
-            binReadsProcessed = 0;
-
-            logger.info(String.format("[MUTECTOR] Processed %d reads in %d ms", totalReadsProcessed, elapsedTime));
-        }
-
         // an optimization to speed things up when there is no coverage
         if ( !FORCE_OUTPUT && numberOfReads == 0) { return -1; }
 
@@ -535,10 +516,6 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> {
                     continue;
                 }
 
-                if (++candidatesInspected % 1000 == 0) {
-                    logger.info(String.format("[MUTECTOR] Inspected %d potential candidates", candidatesInspected));
-                }
-                
                 candidate.setInitialTumorAltCounts(tumorReadPile.qualitySums.getCounts(altAllele));
                 candidate.setInitialTumorRefCounts(tumorReadPile.qualitySums.getCounts(upRef));
                 candidate.setInitialTumorAltQualitySum(tumorReadPile.qualitySums.getQualitySum(altAllele));
