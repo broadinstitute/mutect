@@ -28,10 +28,10 @@ import org.broadinstitute.sting.utils.sam.GATKSAMRecord;
 import org.broadinstitute.sting.utils.variantcontext.VariantContext;
 
 @PartitionBy(PartitionType.LOCUS)
-@BAQMode(ApplicationTime = BAQ.ApplicationTime.HANDLED_IN_WALKER, QualityMode = BAQ.QualityMode.OVERWRITE_QUALS)
+@BAQMode()
 @Reference(window=@Window(start=-1* MuTectWalker.REFERENCE_HALF_WINDOW_LENGTH,stop= MuTectWalker.REFERENCE_HALF_WINDOW_LENGTH))
 @By(DataSource.REFERENCE)
-public class MuTectWalker extends LocusWalker<Integer, Integer> {
+public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeReducible<Integer> {
     public static final int REFERENCE_HALF_WINDOW_LENGTH = 150;
     public static final String BAM_TAG_TUMOR = "tumor";
     public static final String BAM_TAG_NORMAL = "normal";
@@ -53,13 +53,8 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> {
     @Input(fullName="normal_panel", shortName = "normal_panel", doc="VCF file of sites observed in normal", required=false)
     public RodBinding<VariantContext> normalPanelRod;
 
-    @Hidden
-    @Argument(fullName = "noop", required = false, doc="used for debugging, skip the initialize and map methods")
+    @Argument(fullName = "noop", required = false, doc="used for debugging, basically exit as soon as we get the reads")
     public boolean NOOP = false;
-
-    @Hidden
-    @Argument(fullName = "nomap", required = false, doc="used for debugging, perform initialize but no map operations")
-    public boolean NOMAP = false;
 
     @Hidden
     @Argument(fullName = "enable_extended_output", required = false, doc="add many additional columns of statistics to the output file")
@@ -68,9 +63,6 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> {
     @Hidden
     @Argument(fullName = "artifact_detection_mode", required = false, doc="used when running the caller on a normal (as if it were a tumor) to detect artifacts")
     public boolean ARTIFACT_DETECTION_MODE = false;
-
-    @Argument(fullName = "keep_only", required = false, doc="only output passing calls")
-    public boolean KEEP_ONLY = false;
 
 //    @Hidden
 //    @Argument(fullName = "no_baq", required = false, doc="disable use of BAQ to rescore base qualities")
@@ -359,18 +351,37 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> {
         // write out the call stats header
         out.println("## muTector v1.0." + VERSION.split(" ")[1]);
         out.println(callStatsGenerator.generateHeader());
+
+        lastTime = System.currentTimeMillis();
     }
 
     public static int MAX_INSERT_SIZE = 10000;
+    private int totalReadsProcessed = 0;
+    private int binReadsProcessed = 0;
+    private long lastTime;
+    private int candidatesInspected = 0;
 
     @Override
 	public Integer map(final RefMetaDataTracker tracker, final ReferenceContext ref, final AlignmentContext rawContext) {
-        if (NOOP || NOMAP) return 0;
+        if (NOOP) return 0;
         
         TreeMap<Double, String> messageByTumorLod = new TreeMap<Double, String>();
 
         ReadBackedPileup pileup = rawContext.getBasePileup();
         int numberOfReads = pileup.depthOfCoverage();
+        binReadsProcessed += numberOfReads;
+
+        if (binReadsProcessed >= 1000000) {
+            long time = System.currentTimeMillis();
+            long elapsedTime = time - lastTime;
+            lastTime = time;
+
+            totalReadsProcessed += binReadsProcessed;
+            binReadsProcessed = 0;
+
+            logger.info(String.format("[MUTECTOR] Processed %d reads in %d ms", totalReadsProcessed, elapsedTime));
+        }
+
         // an optimization to speed things up when there is no coverage
         if ( !FORCE_OUTPUT && numberOfReads == 0) { return -1; }
 
@@ -516,6 +527,10 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> {
                     continue;
                 }
 
+                if (++candidatesInspected % 1000 == 0) {
+                    logger.info(String.format("[MUTECTOR] Inspected %d potential candidates", candidatesInspected));
+                }
+                
                 candidate.setInitialTumorAltCounts(tumorReadPile.qualitySums.getCounts(altAllele));
                 candidate.setInitialTumorRefCounts(tumorReadPile.qualitySums.getCounts(upRef));
                 candidate.setInitialTumorAltQualitySum(tumorReadPile.qualitySums.getQualitySum(altAllele));
@@ -730,15 +745,11 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> {
                 // test to see if the candidate should be rejected
                 performRejection(candidate);
 
-                if (KEEP_ONLY && candidate.getRejectionReasons().size() > 0) {
-                    // if we are only outputting successful sites...
+                String csOutput = callStatsGenerator.generateCallStats(candidate);
+                if (FORCE_ALLELES) {
+                    out.println(csOutput);
                 } else {
-                    String csOutput = callStatsGenerator.generateCallStats(candidate);
-                    if (FORCE_ALLELES) {
-                        out.println(csOutput);
-                    } else {
-                        messageByTumorLod.put(candidate.getInitialTumorLod(), csOutput);
-                    }
+                    messageByTumorLod.put(candidate.getInitialTumorLod(), csOutput);
                 }
             }
 
