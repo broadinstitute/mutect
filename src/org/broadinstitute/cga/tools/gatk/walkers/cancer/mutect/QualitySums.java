@@ -26,11 +26,11 @@ public class QualitySums {
         throw new RuntimeException("Unknown base: " + base);
     }
 
-    public void incrementSum(final char base, final byte qual) {
-        if (base == 'a' || base == 'A')      { a += qual; aCounts++;}
-        else if (base == 'c' || base == 'C') { c += qual; cCounts++;}
-        else if (base == 'g' || base == 'G') { g += qual; gCounts++; }
-        else if (base == 't' || base == 'T') { t += qual; tCounts++; }
+    public void incrementSum(final char base, final int count, final int qualSum) {
+        if (base == 'a' || base == 'A')      { a += qualSum; aCounts+=count;}
+        else if (base == 'c' || base == 'C') { c += qualSum; cCounts+=count;}
+        else if (base == 'g' || base == 'G') { g += qualSum; gCounts+=count; }
+        else if (base == 't' || base == 'T') { t += qualSum; tCounts+=count; }
         else throw new RuntimeException("Unknown base: " + base);
     }
 

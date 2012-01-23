@@ -36,13 +36,20 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
     public static final String BAM_TAG_TUMOR = "tumor";
     public static final String BAM_TAG_NORMAL = "normal";
 
-
     // DO NOT CHANGE THIS LINE!  It's the SVN revision number of the caller, which updates automatically!
     private static final String VERSION = "$Rev$";
 
-    @Output(doc="Write output to here")
+    @ArgumentCollection private MuTectArgumentCollection MTAC = new MuTectArgumentCollection();
+
+    /***************************************/
+    // Call-stats output
+    /***************************************/
+    @Output(doc="Call-stats output")
     PrintStream out;
 
+    /***************************************/
+    // Reference Metadata inputs
+    /***************************************/
     @Input(fullName="dbsnp", shortName = "dbsnp", doc="VCF file of DBSNP information", required=false)
     public RodBinding<VariantContext> dbsnpRod;
 
@@ -53,114 +60,8 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
     @Input(fullName="normal_panel", shortName = "normal_panel", doc="VCF file of sites observed in normal", required=false)
     public RodBinding<VariantContext> normalPanelRod;
 
-    @Argument(fullName = "noop", required = false, doc="used for debugging, basically exit as soon as we get the reads")
-    public boolean NOOP = false;
-
-    @Hidden
-    @Argument(fullName = "enable_extended_output", required = false, doc="add many additional columns of statistics to the output file")
-    public boolean ENABLE_EXTENDED_OUTPUT = false;
-
-    @Hidden
-    @Argument(fullName = "artifact_detection_mode", required = false, doc="used when running the caller on a normal (as if it were a tumor) to detect artifacts")
-    public boolean ARTIFACT_DETECTION_MODE = false;
-
-//    @Hidden
-//    @Argument(fullName = "no_baq", required = false, doc="disable use of BAQ to rescore base qualities")
-    public boolean NO_BAQ = true;
-
-    @Argument(fullName = "tumor_sample_name", required = false, doc="name to use for tumor in output files")
-    public String TUMOR_SAMPLE_NAME = null;
-
-    @Argument(fullName = "bam_tumor_sample_name", required = false, doc="if the tumor bam contains multiple samples, only use read groups with SM equal to this value")
-    public String BAM_TUMOR_SAMPLE_NAME = null;
-
-    @Argument(fullName = "normal_sample_name", required = false, doc="name to use for normal in output files")
-    public String NORMAL_SAMPLE_NAME = null;
-
-    @Argument(fullName = "force_output", required = false, doc="force output for each site")
-    public boolean FORCE_OUTPUT = false;
-
-    @Argument(fullName = "force_alleles", required = false, doc="force output for all alleles at each site")
-    public boolean FORCE_ALLELES = false;
-
-    @Argument(fullName = "initial_tumor_lod", required = false, doc = "Initial LOD threshold for calling tumor variant")
-    public float INITIAL_TUMOR_LOD_THRESHOLD = 6.3f;
-
-    @Argument(fullName = "initial_tumor_fstar_lod", required = false, doc = "Initial F-star LOD threshold for calling tumor variant")
-    public float INITIAL_TUMOR_FSTAR_LOD_THRESHOLD = 4.0f;
-
-    @Argument(fullName = "tumor_lod", required = false, doc = "LOD threshold for calling tumor variant")
-    public float TUMOR_LOD_THRESHOLD = 6.3f;
-
-    @Argument(fullName = "fraction_contamination", required = false, doc = "estimate of fraction (0-1) of physical contamination with other unrelated samples")
-    public float FRACTION_CONTAMINATION = 0.02f;
-
-    @Argument(fullName = "minimum_mutation_cell_fraction", required = false,
-            doc = "minimum fraction of cells which are presumed to have a mutation, used to handle non-clonality and contamination")
-    public float MINIMUM_MUTATION_CELL_FRACTION = 0.00f;
-
-    @Argument(fullName = "normal_lod", required = false, doc = "LOD threshold for calling normal non-germline")
-    public float NORMAL_LOD_THRESHOLD = 2.3f;
-
-    @Hidden
-    @Argument(fullName = "normal_artifact_lod", required = false, doc = "LOD threshold for calling normal non-variant")
-    public float NORMAL_ARTIFACT_LOD_THRESHOLD = 0.0f;
-
-    @Hidden
-    @Argument(fullName = "strand_artifact_lod", required = false, doc = "LOD threshold for calling strand bias")
-    public float STRAND_ARTIFACT_LOD_THRESHOLD = 2.0f;
-
-    @Hidden
-    @Argument(fullName = "strand_artifact_power_threshold", required = false, doc = "power threshold for calling strand bias")
-    public float STRAND_ARTIFACT_POWER_THRESHOLD = 0.9f;
-
-    @Argument(fullName = "dbsnp_normal_lod", required = false, doc = "LOD threshold for calling normal non-variant at dbsnp sites")
-    public float NORMAL_DBSNP_LOD_THRESHOLD = 5.3f;
-
-    @Argument(fullName = "minimum_normal_allele_fraction", required = false, doc = "minimum allele fraction to be considered in normal, useful for normal sample contaminated with tumor")
-    public float MINIMUM_NORMAL_ALLELE_FRACTION = 0.00f;
-
-    @Argument(fullName = "tumor_f_pretest", required = false, doc = "for computational efficiency, reject sites with allelic fraction below this threshold")
-    public float TUMOR_F_PRETEST = 0.005f;
-
-    @Argument(fullName = "min_qscore", required = false, doc = "threshold for minimum base quality score")
-    public int MIN_QSCORE = 5;
-
-    public int MIN_QSUM_QSCORE = 13;
-
-    @Argument(fullName = "gap_events_threshold", required = false, doc = "how many gapped events (ins/del) are allowed in proximity to this candidate")
-    public int GAP_EVENTS_THRESHOLD = 3;
-
-    @Argument(fullName = "heavily_clipped_read_fraction", required = false, doc = "if this fraction or more of the bases in a read are soft/hard clipped, do not use this read for mutation calling")
-    public float HEAVILY_CLIPPED_READ_FRACTION = 0.30f;
-
-    @Argument(fullName = "clipping_bias_pvalue_threshold", required = false, doc = "pvalue threshold for fishers exact test of clipping bias in mutant reads vs ref reads")
-    public float CLIPPING_BIAS_PVALUE_THRESHOLD = 0.05f;
-
-    @Argument(fullName = "fraction_mapq0_threshold", required = false, doc = "threshold for determining if there is relatedness between the alt and ref allele read piles")
-    public float FRACTION_MAPQ0_THRESHOLD = 0.5f;
-
-    @Argument(fullName = "pir_median_threshold", required = false, doc="threshold for clustered read position artifact median")
-    public double PIR_MEDIAN_THRESHOLD = 10;
-
-    @Argument(fullName = "pir_mad_threshold", required = false, doc="threshold for clustered read position artifact MAD")
-    public double PIR_MAD_THRESHOLD = 3;
-
-    /** Parameters for ALT ALLELE IN NORMAL filter **/
-    @Argument(fullName = "max_alt_alleles_in_normal_count", required = false, doc="threshold for maximum alternate allele counts in normal")
-    public int MAX_ALT_ALLELES_IN_NORMAL_COUNT = 2;
-
-    @Argument(fullName = "max_alt_alleles_in_normal_qscore_sum", required = false, doc="threshold for maximum alternate allele quality score sum in normal")
-    public int MAX_ALT_ALLELES_IN_NORMAL_QSCORE_SUM = 20;
-
-    @Argument(fullName = "max_alt_allele_in_normal_fraction", required = false, doc="threshold for maximum alternate allele fraction in normal")
-    public double MAX_ALT_ALLELE_IN_NORMAL_FRACTION = 0.00;
-    /******************************************/
-
-    public boolean USE_MAPQ0_IN_NORMAL_QSCORE = true;
-
     /***************************************/
-    // coverage related parameters
+    // coverage outputs
     /***************************************/
     @Output(fullName="coverage_file", shortName="cov", doc="write out coverage in WIGGLE format to this file", required=false)
     public PrintStream COVERAGE_FILE = null;
@@ -177,32 +78,9 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
     @Output(fullName="normal_depth_file", shortName="ndf", doc="write out normal read depth in WIGGLE format to this file", required=false)
     public PrintStream NORMAL_DEPTH_FILE = null;
 
-    @Argument(fullName="power_constant_qscore", doc="Phred scale quality score constant to use in power calculations", required=false)
-    public int POWER_CONSTANT_QSCORE = 30;
-
-    @Argument(fullName="absolute_copy_number_data", doc="Absolute Copy Number Data, as defined by Absolute, to use in power calculations", required=false)
-    public File ABSOLUTE_COPY_NUMBER_DATA = null;
-
-    @Argument(fullName="power_constant_af", doc="Allelic fraction constant to use in power calculations", required=false)
-    public double POWER_CONSTANT_AF = 0.3f;
-
-    public enum SequencingErrorModel {
-        solid(5),
-        illumina(1);
-
-        private int priorBaseOffset;
-        private SequencingErrorModel(int priorBaseOffset) {
-            this.priorBaseOffset = priorBaseOffset;
-        }
-
-        public int getPriorBaseOffset() {
-            return priorBaseOffset;
-        }
-    }
-
-    @Hidden
-    @Argument(fullName="sequencing_error_model", shortName="fP", required=false, doc="If provided, the error model will be forced to be the provided String. Valid options are illumina and solid (illumina works well as a generic model")
-    public SequencingErrorModel SEQ_ERROR_MODEL = SequencingErrorModel.illumina;
+    public boolean NO_BAQ = true;
+    public int MIN_QSUM_QSCORE = 13;
+    public boolean USE_MAPQ0_IN_NORMAL_QSCORE = true;
 
     private static final FisherExact fisher = new FisherExact(5000);
 
@@ -268,10 +146,10 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
     @Override
 	public void initialize() {
-        if (NOOP) { return; }
+        if (MTAC.NOOP) { return; }
 
         refReader = this.getToolkit().getReferenceDataSource().getReference();
-        callStatsGenerator = new CallStatsGenerator(ENABLE_EXTENDED_OUTPUT);
+        callStatsGenerator = new CallStatsGenerator(MTAC.ENABLE_EXTENDED_OUTPUT);
 
         // check that we have at least one tumor bam
         for(SAMReaderID id : getToolkit().getReadsDataSource().getReaderIDs()) {
@@ -285,29 +163,29 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                     tumorSAMReaderIDs.add(id);
 
                     // fill in the sample name if necessary
-                    if (TUMOR_SAMPLE_NAME == null) {
+                    if (MTAC.TUMOR_SAMPLE_NAME == null) {
                         try {
                             if (getToolkit().getReadsDataSource().getHeader(id).getReadGroups().size() == 0) {
                                 throw new RuntimeException("No Read Groups found for Tumor BAM -- Read Groups are Required, or supply tumor_sample_name!");
                             }
-                            TUMOR_SAMPLE_NAME = getToolkit().getReadsDataSource().getHeader(id).getReadGroups().get(0).getSample();
+                            MTAC.TUMOR_SAMPLE_NAME = getToolkit().getReadsDataSource().getHeader(id).getReadGroups().get(0).getSample();
                         } catch (NullPointerException npe) {
-                            TUMOR_SAMPLE_NAME = "tumor";
+                            MTAC.TUMOR_SAMPLE_NAME = "tumor";
                         }
                     }
                 } else if (BAM_TAG_NORMAL.equalsIgnoreCase(tag)) {
                     hasNormalBam = true;
 
                     // fill in the sample name if necessary
-                    if (NORMAL_SAMPLE_NAME == null) {
+                    if (MTAC.NORMAL_SAMPLE_NAME == null) {
                         try {
                             if (getToolkit().getReadsDataSource().getHeader(id).getReadGroups().size() == 0) {
                                 throw new RuntimeException("No Read Groups found for Normal BAM -- Read Groups are Required, or supply normal_sample_name!");
                             }
 
-                            NORMAL_SAMPLE_NAME = getToolkit().getReadsDataSource().getHeader(id).getReadGroups().get(0).getSample();
+                            MTAC.NORMAL_SAMPLE_NAME = getToolkit().getReadsDataSource().getHeader(id).getReadGroups().get(0).getSample();
                         } catch (NullPointerException npe) {
-                            NORMAL_SAMPLE_NAME = "normal";
+                            MTAC.NORMAL_SAMPLE_NAME = "normal";
                         }
                     }
                 } else {
@@ -321,21 +199,21 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
         }
 
         if (!hasNormalBam) {
-            NORMAL_LOD_THRESHOLD = -1 * Float.MAX_VALUE;
-            NORMAL_DBSNP_LOD_THRESHOLD = -1 * Float.MAX_VALUE;
-            NORMAL_ARTIFACT_LOD_THRESHOLD = Float.MAX_VALUE;
+            MTAC.NORMAL_LOD_THRESHOLD = -1 * Float.MAX_VALUE;
+            MTAC.NORMAL_DBSNP_LOD_THRESHOLD = -1 * Float.MAX_VALUE;
+            MTAC.NORMAL_ARTIFACT_LOD_THRESHOLD = Float.MAX_VALUE;
         }
 
-        this.contaminantAlternateFraction = Math.max(MINIMUM_MUTATION_CELL_FRACTION, FRACTION_CONTAMINATION);
+        this.contaminantAlternateFraction = Math.max(MTAC.MINIMUM_MUTATION_CELL_FRACTION, MTAC.FRACTION_CONTAMINATION);
 
         // coverage related initialization
-        this.powerConstantEps = Math.pow(10, -1 * (POWER_CONSTANT_QSCORE/10));
+        this.powerConstantEps = Math.pow(10, -1 * (MTAC.POWER_CONSTANT_QSCORE/10));
 
-        this.tumorPowerCalculator = new TumorPowerCalculator(this.powerConstantEps, TUMOR_LOD_THRESHOLD, this.contaminantAlternateFraction);
-        this.normalNovelSitePowerCalculator = new NormalPowerCalculator(this.powerConstantEps, NORMAL_LOD_THRESHOLD);
-        this.normalDbSNPSitePowerCalculator = new NormalPowerCalculator(this.powerConstantEps, NORMAL_DBSNP_LOD_THRESHOLD);
-        this.normalArtifactPowerCalculator = new TumorPowerCalculator(this.powerConstantEps, NORMAL_ARTIFACT_LOD_THRESHOLD, 0.0f);
-        this.strandArtifactPowerCalculator = new TumorPowerCalculator(this.powerConstantEps, STRAND_ARTIFACT_LOD_THRESHOLD, 0.0f);
+        this.tumorPowerCalculator = new TumorPowerCalculator(this.powerConstantEps, MTAC.TUMOR_LOD_THRESHOLD, this.contaminantAlternateFraction);
+        this.normalNovelSitePowerCalculator = new NormalPowerCalculator(this.powerConstantEps, MTAC.NORMAL_LOD_THRESHOLD);
+        this.normalDbSNPSitePowerCalculator = new NormalPowerCalculator(this.powerConstantEps, MTAC.NORMAL_DBSNP_LOD_THRESHOLD);
+        this.normalArtifactPowerCalculator = new TumorPowerCalculator(this.powerConstantEps, MTAC.NORMAL_ARTIFACT_LOD_THRESHOLD, 0.0f);
+        this.strandArtifactPowerCalculator = new TumorPowerCalculator(this.powerConstantEps, MTAC.STRAND_ARTIFACT_LOD_THRESHOLD, 0.0f);
 
         stdCovWriter = new CoverageWiggleFileWriter(COVERAGE_FILE);
         q20CovWriter = new CoverageWiggleFileWriter(COVERAGE_20_Q20_FILE);
@@ -344,8 +222,8 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
         normalDepthWriter = new CoverageWiggleFileWriter(NORMAL_DEPTH_FILE);
 
         // to force output, all we have to do is lower the initial tumor lod threshold to -infinity
-        if (FORCE_OUTPUT) {
-            this.INITIAL_TUMOR_LOD_THRESHOLD = -Float.MAX_VALUE;
+        if (MTAC.FORCE_OUTPUT) {
+            MTAC.INITIAL_TUMOR_LOD_THRESHOLD = -Float.MAX_VALUE;
         }
 
         // write out the call stats header
@@ -363,7 +241,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
     @Override
 	public Integer map(final RefMetaDataTracker tracker, final ReferenceContext ref, final AlignmentContext rawContext) {
-        if (NOOP) return 0;
+        if (MTAC.NOOP) return 0;
         
         TreeMap<Double, String> messageByTumorLod = new TreeMap<Double, String>();
 
@@ -383,7 +261,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
         }
 
         // an optimization to speed things up when there is no coverage
-        if ( !FORCE_OUTPUT && numberOfReads == 0) { return -1; }
+        if ( !MTAC.FORCE_OUTPUT && numberOfReads == 0) { return -1; }
 
         final char upRef = Character.toUpperCase(ref.getBaseAsChar());
         try {
@@ -433,13 +311,13 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             ReadBackedPileup tumorPileup =
                     new ReadBackedPileupImpl(rawContext.getLocation(), tumorPileupElements);
 
-            if (BAM_TUMOR_SAMPLE_NAME != null) {
-                tumorPileup = tumorPileup.getPileupForSample(BAM_TUMOR_SAMPLE_NAME);
+            if (MTAC.BAM_TUMOR_SAMPLE_NAME != null) {
+                tumorPileup = tumorPileup.getPileupForSample(MTAC.BAM_TUMOR_SAMPLE_NAME);
             }
 
             // TODO: do this filtering much earlier so that in the simulation we are drawing from reads that will pass this filter!
-            final LocusReadPile tumorReadPile = new LocusReadPile(tumorPileup, upRef, MIN_QSCORE, MIN_QSUM_QSCORE, false, ARTIFACT_DETECTION_MODE);
-            final LocusReadPile normalReadPile = new LocusReadPile(normalPileup, upRef ,MIN_QSCORE, 0, this.USE_MAPQ0_IN_NORMAL_QSCORE, true);
+            final LocusReadPile tumorReadPile = new LocusReadPile(tumorPileup, upRef, MTAC.MIN_QSCORE, MIN_QSUM_QSCORE, false, MTAC.ARTIFACT_DETECTION_MODE);
+            final LocusReadPile normalReadPile = new LocusReadPile(normalPileup, upRef, MTAC.MIN_QSCORE, 0, this.USE_MAPQ0_IN_NORMAL_QSCORE, true);
 
 
             Collection<VariantContext> panelOfNormalsVC = tracker.getValues(normalPanelRod, rawContext.getLocation());
@@ -477,8 +355,8 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             double tumorPower;
             double normalPower;
             double combinedPower;
-            if (ABSOLUTE_COPY_NUMBER_DATA == null) {
-                tumorPower = tumorPowerCalculator.cachingPowerCalculation(tumorBaseCount, POWER_CONSTANT_AF);
+            if (MTAC.ABSOLUTE_COPY_NUMBER_DATA == null) {
+                tumorPower = tumorPowerCalculator.cachingPowerCalculation(tumorBaseCount, MTAC.POWER_CONSTANT_AF);
 
                 NormalPowerCalculator npc = (knownDbSnpSite)?normalDbSNPSitePowerCalculator:normalNovelSitePowerCalculator;
                 normalPower = npc.cachingPowerCalculation(normalBaseCount);
@@ -501,11 +379,11 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             // Test each of the possible alternate alleles
             for (final char altAllele : new char[]{'A','C','G','T'}) {
                 if (altAllele == upRef) { continue; }
-                if (!FORCE_OUTPUT && tumorReadPile.qualitySums.getCounts(altAllele) == 0) { continue; }
+                if (!MTAC.FORCE_OUTPUT && tumorReadPile.qualitySums.getCounts(altAllele) == 0) { continue; }
 
                 CandidateMutation candidate = new CandidateMutation(rawContext.getLocation(), upRef);
-                candidate.setTumorSampleName(TUMOR_SAMPLE_NAME);
-                candidate.setNormalSampleName(NORMAL_SAMPLE_NAME);
+                candidate.setTumorSampleName(MTAC.TUMOR_SAMPLE_NAME);
+                candidate.setNormalSampleName(MTAC.NORMAL_SAMPLE_NAME);
                 candidate.setCovered(isBaseCovered);
                 candidate.setPower(combinedPower);
                 candidate.setTumorPower(tumorPower);
@@ -517,13 +395,13 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setTotalPairs(totalPairs);
                 candidate.setImproperPairs(improperPairs);
                 candidate.setMapQ0Reads(mapQ0Reads);
-                candidate.setContaminationFraction(FRACTION_CONTAMINATION);
+                candidate.setContaminationFraction(MTAC.FRACTION_CONTAMINATION);
                 candidate.setPanelOfNormalsVC(panelOfNormalsVC.isEmpty()?null:panelOfNormalsVC.iterator().next());
                 candidate.setCosmicSite(!cosmicVC.isEmpty());
                 candidate.setDbsnpSite(knownDbSnpSite);
 
                 candidate.setTumorF(tumorReadPile.estimateAlleleFraction(upRef, altAllele));
-                if (!FORCE_OUTPUT && candidate.getTumorF() < TUMOR_F_PRETEST) {
+                if (!MTAC.FORCE_OUTPUT && candidate.getTumorF() < MTAC.TUMOR_F_PRETEST) {
                     continue;
                 }
 
@@ -546,8 +424,8 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setTumorInsertionCount(tumorReadPile.getInsertionsCount());
                 candidate.setTumorDeletionCount(tumorReadPile.getDeletionsCount());
 
-                if (candidate.getInitialTumorLod() >= this.INITIAL_TUMOR_LOD_THRESHOLD ||
-                    candidate.getTumorLodFStar() >= this. INITIAL_TUMOR_FSTAR_LOD_THRESHOLD ) {
+                if (candidate.getInitialTumorLod() >= MTAC.INITIAL_TUMOR_LOD_THRESHOLD ||
+                    candidate.getTumorLodFStar() >= MTAC.INITIAL_TUMOR_FSTAR_LOD_THRESHOLD ) {
 
                         // if only Java had "unless" and I didn't hate deMorgan's so much...
                 } else {
@@ -600,7 +478,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setInitialNormalBestGenotype(normalReadPile.getBestGenotype(normalGl));
                 candidate.setInitialNormalLod(LocusReadPile.getRefVsAlt(normalGl, upRef, altAllele));
 
-                double normalF = Math.max(normalReadPile.estimateAlleleFraction(normalReadPile.qualityScoreFilteredPileup, upRef, altAllele), MINIMUM_NORMAL_ALLELE_FRACTION);
+                double normalF = Math.max(normalReadPile.estimateAlleleFraction(normalReadPile.qualityScoreFilteredPileup, upRef, altAllele), MTAC.MINIMUM_NORMAL_ALLELE_FRACTION);
                 candidate.setNormalF(normalF);
                 VariableAllelicRatioGenotypeLikelihoods normalFStarGl = normalReadPile.calculateLikelihoods(normalF, normalReadPile.qualityScoreFilteredPileup);
                 candidate.setNormalLodFStar(normalReadPile.getRefVsHet(normalFStarGl, upRef, altAllele));
@@ -627,11 +505,11 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
 
                 if (containsPosition(ref.getWindow(), candidate.getLocation().getStart() - 1)) {
-                    priorBasePositiveDirection = (char) ref.getBases()[(int)candidate.getLocation().getStart() - SEQ_ERROR_MODEL.getPriorBaseOffset() - (int)ref.getWindow().getStart()];
+                    priorBasePositiveDirection = (char) ref.getBases()[(int)candidate.getLocation().getStart() - MTAC.SEQ_ERROR_MODEL.getPriorBaseOffset() - (int)ref.getWindow().getStart()];
                 }
 
                 if (containsPosition(ref.getWindow(), candidate.getLocation().getStart() + 1)) {
-                    priorBaseNegativeDirection = (char) ref.getBases()[(int)candidate.getLocation().getStart() + SEQ_ERROR_MODEL.getPriorBaseOffset() - (int)ref.getWindow().getStart()];
+                    priorBaseNegativeDirection = (char) ref.getBases()[(int)candidate.getLocation().getStart() + MTAC.SEQ_ERROR_MODEL.getPriorBaseOffset() - (int)ref.getWindow().getStart()];
                 }
 
                 candidate.setPriorBasePositiveDirection(priorBasePositiveDirection);
@@ -641,7 +519,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 final LocusReadPile t2 = filterReads(ref, tumorReadPile, true, !NO_BAQ);
 
                 // if there are no reads remaining, abandon this theory
-                if ( !FORCE_OUTPUT && t2.finalPileupReads.size() == 0) { continue; }
+                if ( !MTAC.FORCE_OUTPUT && t2.finalPileupReads.size() == 0) { continue; }
 
                 candidate.setInitialTumorAltCounts(t2.qualitySums.getCounts(altAllele));
                 candidate.setInitialTumorRefCounts(t2.qualitySums.getCounts(upRef));
@@ -746,7 +624,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 performRejection(candidate);
 
                 String csOutput = callStatsGenerator.generateCallStats(candidate);
-                if (FORCE_ALLELES) {
+                if (MTAC.FORCE_ALLELES) {
                     out.println(csOutput);
                 } else {
                     messageByTumorLod.put(candidate.getInitialTumorLod(), csOutput);
@@ -873,10 +751,10 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
         int a = 0, b = 0, c = 0, d = 0;
         for (SAMRecord rec : refPile.finalPileupReads) {
-            if (isReadHeavilyClipped(rec)) { b++;} else { a++; }
+            if (isReadHeavilySoftClipped(rec)) { b++;} else { a++; }
         }
         for (SAMRecord rec : mutantPile.finalPileupReads) {
-            if (isReadHeavilyClipped(rec)) { d++;} else { c++; }
+            if (isReadHeavilySoftClipped(rec)) { d++;} else { c++; }
         }
 
         final double p = fisher.getTwoTailedP(a,b,c,d);
@@ -887,17 +765,18 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
         return new FisherData(a,b,c,d,p, pmaxpos, pmaxneg);
     }
 
-    private boolean isReadHeavilyClipped(SAMRecord rec) {
+    // TODO: we can do this more cheaply with a GATKSAMRecord...
+    private boolean isReadHeavilySoftClipped(SAMRecord rec) {
         int total = 0;
         int clipped = 0;
         for(CigarElement ce : rec.getCigar().getCigarElements()) {
             total += ce.getLength();
-            if (ce.getOperator() == CigarOperator.HARD_CLIP || ce.getOperator() == CigarOperator.SOFT_CLIP) {
+            if (ce.getOperator() == CigarOperator.SOFT_CLIP) {
                 clipped += ce.getLength();
             }
         }
 
-        return ((float) clipped / (float)total >= HEAVILY_CLIPPED_READ_FRACTION);
+        return ((float) clipped / (float)total >= MTAC.HEAVILY_CLIPPED_READ_FRACTION);
     }
 
     private FisherData calculateStrandBias(LocusReadPile refPile, LocusReadPile mutantPile) {
@@ -977,11 +856,11 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
     private static final double QUALITY_RST_PVALUE_THRESHOLD = .005;
 
     private void performRejection(CandidateMutation candidate) {
-        if (candidate.getTumorLodFStar() < TUMOR_LOD_THRESHOLD) {
+        if (candidate.getTumorLodFStar() < MTAC.TUMOR_LOD_THRESHOLD) {
             candidate.addRejectionReason("fstar_tumor_lod");
         }
 
-        if (ARTIFACT_DETECTION_MODE) {
+        if (MTAC.ARTIFACT_DETECTION_MODE) {
             return;
         }
 
@@ -994,20 +873,20 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             candidate.addRejectionReason("het_normal");
         }
 
-        if (candidate.getTumorInsertionCount() >= GAP_EVENTS_THRESHOLD ||
-            candidate.getTumorDeletionCount()  >= GAP_EVENTS_THRESHOLD) {
+        if (candidate.getTumorInsertionCount() >= MTAC.GAP_EVENTS_THRESHOLD ||
+            candidate.getTumorDeletionCount()  >= MTAC.GAP_EVENTS_THRESHOLD) {
             candidate.addRejectionReason("nearby_gap_events");
         }
 
-        if (FRACTION_CONTAMINATION+MINIMUM_MUTATION_CELL_FRACTION > 0 && candidate.getTumorLodFStar() <= TUMOR_LOD_THRESHOLD + Math.max(0, candidate.getContaminantLod())) {
+        if (MTAC.FRACTION_CONTAMINATION+MTAC.MINIMUM_MUTATION_CELL_FRACTION > 0 && candidate.getTumorLodFStar() <= MTAC.TUMOR_LOD_THRESHOLD + Math.max(0, candidate.getContaminantLod())) {
             candidate.addRejectionReason("possible_contamination");
         }
 
-        if (candidate.isDbsnpSite() && candidate.getInitialNormalLod() < NORMAL_DBSNP_LOD_THRESHOLD) {
+        if (candidate.isDbsnpSite() && candidate.getInitialNormalLod() < MTAC.NORMAL_DBSNP_LOD_THRESHOLD) {
             candidate.addRejectionReason("DBSNP Site");
         }
 
-        if (candidate.getInitialNormalLod() < NORMAL_LOD_THRESHOLD) {
+        if (candidate.getInitialNormalLod() < MTAC.NORMAL_LOD_THRESHOLD) {
             candidate.addRejectionReason("normal_lod");
         }
 
@@ -1015,12 +894,12 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 //            candidate.addRejectionReason("alt allele in normal");
 //        }
 
-        if (candidate.getNormalArtifactLod() > NORMAL_ARTIFACT_LOD_THRESHOLD) {
+        if (candidate.getNormalArtifactLod() > MTAC.NORMAL_ARTIFACT_LOD_THRESHOLD) {
             candidate.addRejectionReason("normal_artifact_lod");
         }
 
-        if ( (candidate.getTumorForwardOffsetsInReadMedian() != null && candidate.getTumorForwardOffsetsInReadMedian() <= PIR_MEDIAN_THRESHOLD && candidate.getTumorForwardOffsetsInReadMad() != null && candidate.getTumorForwardOffsetsInReadMad() <= PIR_MAD_THRESHOLD) ||
-              candidate.getTumorReverseOffsetsInReadMedian() != null && candidate.getTumorReverseOffsetsInReadMedian() <= PIR_MEDIAN_THRESHOLD && candidate.getTumorReverseOffsetsInReadMad() != null && candidate.getTumorReverseOffsetsInReadMad() <= PIR_MAD_THRESHOLD ) {
+        if ( (candidate.getTumorForwardOffsetsInReadMedian() != null && candidate.getTumorForwardOffsetsInReadMedian() <= MTAC.PIR_MEDIAN_THRESHOLD && candidate.getTumorForwardOffsetsInReadMad() != null && candidate.getTumorForwardOffsetsInReadMad() <= MTAC.PIR_MAD_THRESHOLD) ||
+              candidate.getTumorReverseOffsetsInReadMedian() != null && candidate.getTumorReverseOffsetsInReadMedian() <= MTAC.PIR_MEDIAN_THRESHOLD && candidate.getTumorReverseOffsetsInReadMad() != null && candidate.getTumorReverseOffsetsInReadMad() <= MTAC.PIR_MAD_THRESHOLD ) {
             candidate.addRejectionReason("clustered_read_position");
 
         }
@@ -1052,20 +931,20 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 //            candidate.addRejectionReason("negative_strand_artifact");
 //        }
 
-        if (candidate.getPowerToDetectNegativeStrandArtifact() >= STRAND_ARTIFACT_POWER_THRESHOLD && candidate.getTumorLodFStarForward() < STRAND_ARTIFACT_LOD_THRESHOLD) {
+        if (candidate.getPowerToDetectNegativeStrandArtifact() >= MTAC.STRAND_ARTIFACT_POWER_THRESHOLD && candidate.getTumorLodFStarForward() < MTAC.STRAND_ARTIFACT_LOD_THRESHOLD) {
             candidate.addRejectionReason("strand_artifact");
         }
 
-        if (candidate.getPowerToDetectPositiveStrandArtifact() >= STRAND_ARTIFACT_POWER_THRESHOLD && candidate.getTumorLodFStarReverse() < STRAND_ARTIFACT_LOD_THRESHOLD) {
+        if (candidate.getPowerToDetectPositiveStrandArtifact() >= MTAC.STRAND_ARTIFACT_POWER_THRESHOLD && candidate.getTumorLodFStarReverse() < MTAC.STRAND_ARTIFACT_LOD_THRESHOLD) {
             candidate.addRejectionReason("strand_artifact");
         }
 
-        if (candidate.getTotalPairs() > 0 && ((float)candidate.getMapQ0Reads() / (float)candidate.getTotalPairs()) >= FRACTION_MAPQ0_THRESHOLD) {
+        if (candidate.getTotalPairs() > 0 && ((float)candidate.getMapQ0Reads() / (float)candidate.getTotalPairs()) >= MTAC.FRACTION_MAPQ0_THRESHOLD) {
             candidate.addRejectionReason("poor_mapping_region_mapq0");
         }
 
-
-        if (candidate.isSeenInPanelOfNormals()) {
+        // reject non-cosmic sites that were observed in the panel of normals
+        if (!candidate.isCosmicSite() && candidate.isSeenInPanelOfNormals()) {
             candidate.addRejectionReason("seen_in_panel_of_normals");
         }
     }
@@ -1151,7 +1030,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             }
 
             // is this a heavily clipped read?
-            if (isReadHeavilyClipped(read)) {
+            if (isReadHeavilySoftClipped(read)) {
                 continue;
             }
 

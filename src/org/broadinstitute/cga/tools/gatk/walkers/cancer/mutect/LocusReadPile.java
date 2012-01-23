@@ -53,7 +53,7 @@ public class LocusReadPile {
             if (p.getMappingQual() == 0 && !allowMapq0ForQualSum) { continue; }
             if (p.getQual() <= minQSumQualityScore) { continue; }
 
-            if (p.getQual() > this.minQSumQualityScore) { qualitySums.incrementSum((char)p.getBase(), p.getQual()); }
+            if (p.getQual() > this.minQSumQualityScore) { qualitySums.incrementSum((char)p.getBase(), p.getRepresentativeCount(), p.getRepresentativeCount() * p.getQual()); }
         }
 
         this.finalPileupReads = finalPileup.getReads();
