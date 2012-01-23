@@ -943,9 +943,14 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             candidate.addRejectionReason("poor_mapping_region_mapq0");
         }
 
-        // reject non-cosmic sites that were observed in the panel of normals
-        if (!candidate.isCosmicSite() && candidate.isSeenInPanelOfNormals()) {
-            candidate.addRejectionReason("seen_in_panel_of_normals");
+        if (candidate.isSeenInPanelOfNormals()) {
+
+            if (candidate.isCosmicSite() && !candidate.isDbsnpSite()) {
+                // if we saw it in the panel of normals, retain the call it was a COSMIC, but non-dbsnp site,
+            } else {
+                // otherwise, reject it
+                candidate.addRejectionReason("seen_in_panel_of_normals");
+            }
         }
     }
 

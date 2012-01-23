@@ -105,6 +105,10 @@ public class CallStatsGenerator {
         }
 
         String siteInfo = "NOVEL";
+        if (candidate.isDbsnpSite() && candidate.isCosmicSite()) {
+            siteInfo = "DBSNP+COSMIC";
+        }
+
         if (candidate.isDbsnpSite()) {
             siteInfo = "DBSNP";
         }
