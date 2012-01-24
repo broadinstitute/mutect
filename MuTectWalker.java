@@ -3,7 +3,6 @@ package org.broadinstitute.cga.tools.gatk.walkers.cancer.mutect;
 import java.io.*;
 import java.util.*;
 
-import com.sun.xml.internal.bind.v2.TODO;
 import net.sf.picard.reference.IndexedFastaSequenceFile;
 import net.sf.samtools.*;
 
