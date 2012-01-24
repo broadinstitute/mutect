@@ -3,6 +3,7 @@ package org.broadinstitute.cga.tools.gatk.walkers.cancer.mutect;
 import java.io.*;
 import java.util.*;
 
+import com.sun.xml.internal.bind.v2.TODO;
 import net.sf.picard.reference.IndexedFastaSequenceFile;
 import net.sf.samtools.*;
 
@@ -325,11 +326,11 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             Collection<VariantContext> dbsnpVC = tracker.getValues(dbsnpRod, rawContext.getLocation());
 
             // remove the effect of cosmic from dbSNP
-            boolean knownDbSnpSite = (!dbsnpVC.isEmpty() && cosmicVC.isEmpty());
+            boolean germlineAtRisk = (!dbsnpVC.isEmpty() && cosmicVC.isEmpty());
 
             // compute coverage flags
             int tumorCoveredDepthThreshold = 14;
-            int normalCoveredDepthThreshold = (knownDbSnpSite)?19:8;
+            int normalCoveredDepthThreshold = (germlineAtRisk)?19:8;
             if (!hasNormalBam) {
                 normalCoveredDepthThreshold = 0;
             }
@@ -358,7 +359,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             if (MTAC.ABSOLUTE_COPY_NUMBER_DATA == null) {
                 tumorPower = tumorPowerCalculator.cachingPowerCalculation(tumorBaseCount, MTAC.POWER_CONSTANT_AF);
 
-                NormalPowerCalculator npc = (knownDbSnpSite)?normalDbSNPSitePowerCalculator:normalNovelSitePowerCalculator;
+                NormalPowerCalculator npc = (germlineAtRisk)?normalDbSNPSitePowerCalculator:normalNovelSitePowerCalculator;
                 normalPower = npc.cachingPowerCalculation(normalBaseCount);
 
                 combinedPower = tumorPower*normalPower;
@@ -398,7 +399,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setContaminationFraction(MTAC.FRACTION_CONTAMINATION);
                 candidate.setPanelOfNormalsVC(panelOfNormalsVC.isEmpty()?null:panelOfNormalsVC.iterator().next());
                 candidate.setCosmicSite(!cosmicVC.isEmpty());
-                candidate.setDbsnpSite(knownDbSnpSite);
+                candidate.setDbsnpSite(!dbsnpVC.isEmpty());
 
                 candidate.setTumorF(tumorReadPile.estimateAlleleFraction(upRef, altAllele));
                 if (!MTAC.FORCE_OUTPUT && candidate.getTumorF() < MTAC.TUMOR_F_PRETEST) {
@@ -882,7 +883,8 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             candidate.addRejectionReason("possible_contamination");
         }
 
-        if (candidate.isDbsnpSite() && candidate.getInitialNormalLod() < MTAC.NORMAL_DBSNP_LOD_THRESHOLD) {
+        //TODO: clean up this rejection reason. no space and it's really "germline risk" or something
+        if (candidate.isGermlineAtRisk() && candidate.getInitialNormalLod() < MTAC.NORMAL_DBSNP_LOD_THRESHOLD) {
             candidate.addRejectionReason("DBSNP Site");
         }
 
@@ -944,7 +946,6 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
         }
 
         if (candidate.isSeenInPanelOfNormals()) {
-
             if (candidate.isCosmicSite() && !candidate.isDbsnpSite()) {
                 // if we saw it in the panel of normals, retain the call it was a COSMIC, but non-dbsnp site,
             } else {

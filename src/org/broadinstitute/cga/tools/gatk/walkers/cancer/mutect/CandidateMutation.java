@@ -113,6 +113,10 @@ public class CandidateMutation {
     public boolean isNegativeDirectionAtRisk() {
         return getPriorBaseNegativeDirection() == getAltAllele();
     }
+    
+    public boolean isGermlineAtRisk() {
+        return (dbsnpSite && !cosmicSite);
+    }
 
     // -------------------------------------------------------------------------
     // GENERATED CODE BELOW THIS POINT
