@@ -946,7 +946,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
         }
 
         if (candidate.isSeenInPanelOfNormals()) {
-            if (candidate.isCosmicSite() && !candidate.isDbsnpSite()) {
+            if (candidate.isCosmicSite()) {
                 // if we saw it in the panel of normals, retain the call it was a COSMIC, but non-dbsnp site,
             } else {
                 // otherwise, reject it
