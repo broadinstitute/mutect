@@ -19,7 +19,7 @@ public class CallStatsGenerator {
     private static final String[] COMPLETE_CALL_STATS_HEADER =
             new String[]{
                 "contig","position","ref_allele","alt_allele","tumor_name","normal_name","score","dbsnp_site",
-                "covered", "power", "tumor_power", "normal_power",
+                "covered", "power", "tumor_power", "normal_power", "normal_power_nsp", "normal_power_wsp",
                 "total_pairs","improper_pairs","map_Q0_reads",
                 "init_t_lod","t_lod_fstar","t_lod_fstar_forward", "t_lod_fstar_reverse", "tumor_f","contaminant_fraction","contaminant_lod","minimum_tumor_f", "t_q20_count", "t_ref_count","t_alt_count","t_ref_sum","t_alt_sum","t_ins_count","t_del_count",
                 "normal_best_gt","init_n_lod","n_lod_fstar","normal_f","normal_artifact_lod","n_q20_count", "n_ref_count","n_alt_count","n_ref_sum","n_alt_sum",
@@ -129,6 +129,8 @@ public class CallStatsGenerator {
                         format(candidate.getPower()),
                         format(candidate.getTumorPower()),
                         format(candidate.getNormalPower()),
+                        format(candidate.getNormalPowerNoSNPPrior()),
+                        format(candidate.getNormalPowerWithSNPPrior()),
                         format(candidate.getTotalPairs()),
                         format(candidate.getImproperPairs()),
                         format(candidate.getMapQ0Reads()),

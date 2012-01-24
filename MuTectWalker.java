@@ -354,13 +354,17 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             // TODO: use ASCN information
             double tumorPower;
             double normalPower;
+            double normalPowerWithSNPPrior;
+            double normalPowerNoSNPPrior;
             double combinedPower;
             if (MTAC.ABSOLUTE_COPY_NUMBER_DATA == null) {
                 tumorPower = tumorPowerCalculator.cachingPowerCalculation(tumorBaseCount, MTAC.POWER_CONSTANT_AF);
 
-                NormalPowerCalculator npc = (germlineAtRisk)?normalDbSNPSitePowerCalculator:normalNovelSitePowerCalculator;
-                normalPower = npc.cachingPowerCalculation(normalBaseCount);
-
+                normalPowerNoSNPPrior = normalNovelSitePowerCalculator.cachingPowerCalculation(normalBaseCount);
+                normalPowerWithSNPPrior = normalDbSNPSitePowerCalculator.cachingPowerCalculation(normalBaseCount);
+                
+                normalPower = (germlineAtRisk)?normalPowerWithSNPPrior:normalPowerNoSNPPrior;
+                
                 combinedPower = tumorPower*normalPower;
                 if (!hasNormalBam) {
                     combinedPower = tumorPower;
@@ -388,6 +392,8 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setPower(combinedPower);
                 candidate.setTumorPower(tumorPower);
                 candidate.setNormalPower(normalPower);
+                candidate.setNormalPowerWithSNPPrior(normalPowerWithSNPPrior);
+                candidate.setNormalPowerNoSNPPrior(normalPowerNoSNPPrior);
                 candidate.setTumorQ20Count(tumorQ20BaseCount);
                 candidate.setNormalQ20Count(normalQ20BaseCount);
                 candidate.setInitialTumorNonRefQualitySum(tumorReadPile.qualitySums.getOtherQualities(upRef));

@@ -20,6 +20,8 @@ public class CandidateMutation {
     private double power;
     private double tumorPower;
     private double normalPower;
+    private double normalPowerWithSNPPrior;
+    private double normalPowerNoSNPPrior;
 
     private char altAllele = 'N';
     private char priorBasePositiveDirection;
@@ -669,4 +671,21 @@ public class CandidateMutation {
     public void setPowerToDetectNegativeStrandArtifact(double powerToDetectNegativeStrandArtifact) {
         this.powerToDetectNegativeStrandArtifact = powerToDetectNegativeStrandArtifact;
     }
+
+    public double getNormalPowerWithSNPPrior() {
+        return normalPowerWithSNPPrior;
+    }
+
+    public void setNormalPowerWithSNPPrior(double normalPowerWithSNPPrior) {
+        this.normalPowerWithSNPPrior = normalPowerWithSNPPrior;
+    }
+
+    public double getNormalPowerNoSNPPrior() {
+        return normalPowerNoSNPPrior;
+    }
+
+    public void setNormalPowerNoSNPPrior(double normalPowerNoSNPPrior) {
+        this.normalPowerNoSNPPrior = normalPowerNoSNPPrior;
+    }
 }
+
