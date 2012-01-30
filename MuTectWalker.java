@@ -847,8 +847,11 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
         List<Integer> positions = new ArrayList<Integer>();
         for(PileupElement pe : p) {
             // TODO: maybe we should be doing start-site distribution, or a clipping aware offset?
+                GATKSAMRecord r = pe.getRead();
+
                 positions.add(
-                        Math.abs((int)(p.getLocation().getStart() - (useForwardOffsets?pe.getRead().getAlignmentStart():pe.getRead().getAlignmentEnd())))
+                        Math.abs((int)(p.getLocation().getStart() -
+                                (useForwardOffsets?r.getOriginalAlignmentStart():r.getOriginalAlignmentEnd())))
                 );
         }
 
@@ -1056,7 +1059,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             }
 
             // if we're here... we passed all the read filters!
-            newPileupElements.add(new PileupElement(read, p.getOffset(), false));
+            newPileupElements.add(new PileupElement(read, p.getOffset(), p.isDeletion(), p.isBeforeInsertion(), p.isSoftClipped()));
 
 
         }
