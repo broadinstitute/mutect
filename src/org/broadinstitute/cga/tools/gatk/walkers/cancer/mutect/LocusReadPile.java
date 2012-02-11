@@ -11,6 +11,8 @@ import org.broadinstitute.sting.utils.pileup.*;
 import org.broadinstitute.sting.utils.BaseUtils;
 import org.broadinstitute.sting.utils.sam.GATKSAMRecord;
 
+import static java.lang.Math.pow;
+
 public class LocusReadPile {
     protected ReadBackedPileup pileup;
     List<GATKSAMRecord> finalPileupReads;
@@ -179,6 +181,25 @@ public class LocusReadPile {
         double altCount = (double) counts[BaseUtils.simpleBaseToBaseIndex(alt)];
         double depth = refCount + altCount;
         return (depth==0)?0:(altCount / depth);
+    }
+
+    static public double calculateLogLikelihood(ReadBackedPileup pileup, byte ref, byte alt, double f) {
+        double ll = 0;
+        for(PileupElement pe : pileup) {
+            byte base = pe.getBase();
+            byte qual = pe.getQual();
+            double e = pow(10, (qual / -10.0));
+
+            if (base == ref) {
+                ll += Math.log10(f*e/3 + (1-f)*(1-e));
+            } else if (base == alt) {
+                ll += Math.log10(f*(1-e) + (1-f)*e/3);
+            } else {
+                ll += Math.log10(2*e/3);
+            }
+
+        }
+        return ll;
     }
 
     public VariableAllelicRatioGenotypeLikelihoods calculateLikelihoods(ReadBackedPileup pileup) {
