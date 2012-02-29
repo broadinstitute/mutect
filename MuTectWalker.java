@@ -264,6 +264,8 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
         if ( !MTAC.FORCE_OUTPUT && numberOfReads == 0) { return -1; }
 
         final char upRef = Character.toUpperCase(ref.getBaseAsChar());
+        String sequenceContext = createSequenceContext(ref, 3);
+
         try {
 
 
@@ -386,6 +388,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 if (!MTAC.FORCE_OUTPUT && tumorReadPile.qualitySums.getCounts(altAllele) == 0) { continue; }
 
                 CandidateMutation candidate = new CandidateMutation(rawContext.getLocation(), upRef);
+                candidate.setSequenceContext(sequenceContext);
                 candidate.setTumorSampleName(MTAC.TUMOR_SAMPLE_NAME);
                 candidate.setNormalSampleName(MTAC.NORMAL_SAMPLE_NAME);
                 candidate.setCovered(isBaseCovered);
@@ -649,6 +652,22 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             throw new RuntimeException(t);
         }
     }
+
+
+    private String createSequenceContext(ReferenceContext ref, int size) {
+        // create a context of 3 bases before, then 'x' then three bases after
+        int offset = ref.getLocus().getStart() - ref.getWindow().getStart();
+        StringBuilder sb = new StringBuilder(7);
+        for(byte b : Arrays.copyOfRange(ref.getBases(), offset - size, offset)) {
+            sb.append(Character.toUpperCase((char)b));
+        }
+        sb.append('x');
+        for(byte b : Arrays.copyOfRange(ref.getBases(), offset + 1, offset + 1 + size)) {
+            sb.append(Character.toUpperCase((char)b));
+        }
+        return sb.toString();
+    }
+
 
     /**
      * Helper function that returns the phred-scaled base quality score we should use for calculating

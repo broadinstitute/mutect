@@ -18,7 +18,7 @@ public class CallStatsGenerator {
 
     private static final String[] COMPLETE_CALL_STATS_HEADER =
             new String[]{
-                "contig","position","ref_allele","alt_allele","tumor_name","normal_name","score","dbsnp_site",
+                "contig","position","context","ref_allele","alt_allele","tumor_name","normal_name","score","dbsnp_site",
                 "covered", "power", "tumor_power", "normal_power", "normal_power_nsp", "normal_power_wsp",
                 "total_pairs","improper_pairs","map_Q0_reads",
                 "init_t_lod","t_lod_fstar","t_lod_fstar_forward", "t_lod_fstar_reverse", "tumor_f","contaminant_fraction","contaminant_lod","minimum_tumor_f", "t_q20_count", "t_ref_count","t_alt_count","t_ref_sum","t_alt_sum","t_ins_count","t_del_count",
@@ -34,7 +34,7 @@ public class CallStatsGenerator {
 
     private static final String[] MINIMAL_CALL_STATS_HEADER =
             new String[]{
-                "contig","position","ref_allele","alt_allele","tumor_name","normal_name","score","dbsnp_site",
+                "contig","position","context","ref_allele","alt_allele","tumor_name","normal_name","score","dbsnp_site",
                 "covered", "power", "tumor_power", "normal_power",
                 "total_pairs","improper_pairs","map_Q0_reads",
                 "t_lod_fstar","tumor_f","contaminant_fraction","contaminant_lod",
@@ -119,6 +119,7 @@ public class CallStatsGenerator {
         String[] msg = new String[] {
                         candidate.getLocation().getContig(),
                         format(candidate.getLocation().getStart()),
+                        candidate.getSequenceContext(),
                         ""+candidate.getRefAllele(),
                         ""+candidate.getAltAllele(),
                         candidate.getTumorSampleName(),

@@ -11,6 +11,7 @@ import java.util.Map;
 
 public class CandidateMutation {
     private GenomeLoc location;
+    private String sequenceContext;
     private char refAllele;
     private boolean dbsnpSite = false;
     private boolean cosmicSite = false;
@@ -159,6 +160,14 @@ public class CandidateMutation {
 
     public void setCovered(boolean covered) {
         this.covered = covered;
+    }
+
+    public String getSequenceContext() {
+        return sequenceContext;
+    }
+
+    public void setSequenceContext(String sequenceContext) {
+        this.sequenceContext = sequenceContext;
     }
 
     public char getRefAllele() {
