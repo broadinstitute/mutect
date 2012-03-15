@@ -429,7 +429,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 // TODO: why extract the counts twice?  once above and once in this method...
                 candidate.setTumorF(tumorReadPile.estimateAlleleFraction(upRef, altAllele));
                 double tumorFLB = 0;
-                int refCount = candidate.getInitialNormalRefCounts();
+                int refCount = candidate.getInitialTumorRefCounts();
                 int altCount = candidate.getInitialTumorAltCounts();
                 int depth = refCount + altCount;
                 if ( depth > 0) {
