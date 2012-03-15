@@ -579,7 +579,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 refCount = candidate.getInitialNormalRefCounts();
                 altCount = candidate.getInitialTumorAltCounts();
                 depth = refCount + altCount;
-                if ( depth > 0) {
+                if ( depth > 0 & altCount > 0) {
                     // implemented as shown http://www.sigmazone.com/binomial_confidence_interval.htm
                     BetaDistribution dist = new BetaDistributionImpl(depth - altCount + 1, altCount);
                     tumorFLB = 1 - dist.inverseCumulativeProbability(1 - (1-0.95)/2);
