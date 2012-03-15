@@ -447,11 +447,11 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 VariableAllelicRatioGenotypeLikelihoods tumorFStarGl = tumorReadPile.calculateLikelihoods(candidate.getTumorF(), tumorReadPile.finalPileup);
                 candidate.setTumorLodFStar(tumorReadPile.getHetVsRef(tumorFStarGl, upRef, altAllele));
 
-                
                 double newLod = tumorReadPile.calculateLOD((byte)altAllele, candidate.getTumorF(), 0);
                 if (Math.abs(newLod - candidate.getTumorLodFStar()) > 0.001) {
                     throw new RuntimeException(String.format("Error in LOD calculations -- new %6.6f vs old %6.6f ", newLod, candidate.getTumorLodFStar() ));
                 }
+
                 candidate.setTumorInsertionCount(tumorReadPile.getInsertionsCount());
                 candidate.setTumorDeletionCount(tumorReadPile.getDeletionsCount());
 
@@ -522,7 +522,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setNormalArtifactLodTF(normalReadPile.getAltVsRef(normalArtifactGlTF, upRef, altAllele));
 
                 VariableAllelicRatioGenotypeLikelihoods normalArtifactGlLowTF = normalReadPile.calculateLikelihoods(candidate.getTumorFLowerBound(), normalReadPile.qualityScoreFilteredPileup);
-                candidate.setNormalArtifactLodTF(normalReadPile.getAltVsRef(normalArtifactGlLowTF, upRef, altAllele));
+                candidate.setNormalArtifactLodLowTF(normalReadPile.getAltVsRef(normalArtifactGlLowTF, upRef, altAllele));
 
                 VariableAllelicRatioGenotypeLikelihoods normalArtifactGlNF = normalReadPile.calculateLikelihoods(candidate.getNormalF(), normalReadPile.qualityScoreFilteredPileup);
                 candidate.setNormalArtifactLodNF(normalReadPile.getAltVsRef(normalArtifactGlNF, upRef, altAllele));
