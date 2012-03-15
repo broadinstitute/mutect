@@ -183,6 +183,16 @@ public class LocusReadPile {
         return (depth==0)?0:(altCount / depth);
     }
 
+    public double calculateLogLikelihood(byte alt, double f) {
+        return LocusReadPile.calculateLogLikelihood(this.finalPileup, ((byte) this.refBase), alt, f);
+    }
+
+    public double calculateLOD(byte alt, double fAlternate, double fReference) {
+        double lodAlt = LocusReadPile.calculateLogLikelihood(this.finalPileup, ((byte) this.refBase), alt, fAlternate);
+        double lodRef = LocusReadPile.calculateLogLikelihood(this.finalPileup, ((byte) this.refBase), alt, fReference);
+        return lodAlt - lodRef;
+    }
+
     static public double calculateLogLikelihood(ReadBackedPileup pileup, byte ref, byte alt, double f) {
         double ll = 0;
         for(PileupElement pe : pileup) {

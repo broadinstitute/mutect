@@ -61,7 +61,7 @@ public class MuTectArgumentCollection {
 
     @Hidden
     @Argument(fullName = "normal_artifact_lod", required = false, doc = "LOD threshold for calling normal non-variant")
-    public float NORMAL_ARTIFACT_LOD_THRESHOLD = 0.0f;
+    public float NORMAL_ARTIFACT_LOD_THRESHOLD = 1.0f;
 
     @Hidden
     @Argument(fullName = "strand_artifact_lod", required = false, doc = "LOD threshold for calling strand bias")

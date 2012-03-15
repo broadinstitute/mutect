@@ -7,6 +7,8 @@ import net.sf.picard.reference.IndexedFastaSequenceFile;
 import net.sf.samtools.*;
 
 import org.apache.commons.math.MathException;
+import org.apache.commons.math.distribution.BetaDistribution;
+import org.apache.commons.math.distribution.BetaDistributionImpl;
 import org.apache.commons.math.distribution.BinomialDistribution;
 import org.apache.commons.math.distribution.BinomialDistributionImpl;
 import org.broadinstitute.sting.commandline.*;
@@ -409,7 +411,8 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setCosmicSite(!cosmicVC.isEmpty());
                 candidate.setDbsnpSite(!dbsnpVC.isEmpty());
 
-                candidate.setTumorF(tumorReadPile.estimateAlleleFraction(upRef, altAllele));
+
+                
                 if (!MTAC.FORCE_OUTPUT && candidate.getTumorF() < MTAC.TUMOR_F_PRETEST) {
                     continue;
                 }
@@ -423,6 +426,20 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setInitialTumorAltQualitySum(tumorReadPile.qualitySums.getQualitySum(altAllele));
                 candidate.setInitialTumorRefQualitySum(tumorReadPile.qualitySums.getQualitySum(upRef));
 
+                // TODO: why extract the counts twice?  once above and once in this method...
+                candidate.setTumorF(tumorReadPile.estimateAlleleFraction(upRef, altAllele));
+                double tumorFLB = 0;
+                int refCount = candidate.getInitialNormalRefCounts();
+                int altCount = candidate.getInitialTumorAltCounts();
+                int depth = refCount + altCount;
+                if ( depth > 0) {
+                    // implemented as shown http://www.sigmazone.com/binomial_confidence_interval.htm
+                    BetaDistribution dist = new BetaDistributionImpl(depth - altCount + 1, altCount);
+                    tumorFLB = 1 - dist.inverseCumulativeProbability(1 - (1-0.95)/2);
+                }
+                candidate.setTumorFLowerBound(tumorFLB);
+
+
                 VariableAllelicRatioGenotypeLikelihoods tumorGl = tumorReadPile.calculateLikelihoods(tumorReadPile.finalPileup);
                 candidate.setInitialTumorLod(tumorReadPile.getAltVsRef(tumorGl, upRef, altAllele));
                 candidate.setInitialTumorReadDepth(tumorReadPile.finalPileupReads.size());
@@ -430,6 +447,11 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 VariableAllelicRatioGenotypeLikelihoods tumorFStarGl = tumorReadPile.calculateLikelihoods(candidate.getTumorF(), tumorReadPile.finalPileup);
                 candidate.setTumorLodFStar(tumorReadPile.getHetVsRef(tumorFStarGl, upRef, altAllele));
 
+                
+                double newLod = tumorReadPile.calculateLOD((byte)altAllele, candidate.getTumorF(), 0);
+                if (Math.abs(newLod - candidate.getTumorLodFStar()) > 0.001) {
+                    throw new RuntimeException(String.format("Error in LOD calculations -- new %6.6f vs old %6.6f ", newLod, candidate.getTumorLodFStar() ));
+                }
                 candidate.setTumorInsertionCount(tumorReadPile.getInsertionsCount());
                 candidate.setTumorDeletionCount(tumorReadPile.getDeletionsCount());
 
@@ -440,9 +462,6 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 } else {
                     continue;
                 }
-
-                // calculate power to have detected this artifact in the normal
-                candidate.setNormalArtifactPower(this.normalArtifactPowerCalculator.cachingPowerCalculation(normalBaseCount, candidate.getTumorF()));
 
                 // calculate lod of contaminant
                 double contaminantF = Math.min(contaminantAlternateFraction, candidate.getTumorF());
@@ -493,9 +512,20 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setNormalLodFStar(normalReadPile.getRefVsHet(normalFStarGl, upRef, altAllele));
 
 
+                // calculate power to have detected this artifact in the normal
+                candidate.setNormalArtifactPowerTF(this.normalArtifactPowerCalculator.cachingPowerCalculation(normalBaseCount, candidate.getTumorF()));
+                candidate.setNormalArtifactPowerLowTF(this.normalArtifactPowerCalculator.cachingPowerCalculation(normalBaseCount, candidate.getTumorFLowerBound()));
+                candidate.setNormalArtifactPowerNF(this.normalArtifactPowerCalculator.cachingPowerCalculation(normalBaseCount, candidate.getNormalF()));
 
-                VariableAllelicRatioGenotypeLikelihoods normalArtifactGl = normalReadPile.calculateLikelihoods(candidate.getTumorF(), normalReadPile.qualityScoreFilteredPileup);
-                candidate.setNormalArtifactLod(normalReadPile.getAltVsRef(normalArtifactGl, upRef, altAllele));
+
+                VariableAllelicRatioGenotypeLikelihoods normalArtifactGlTF = normalReadPile.calculateLikelihoods(candidate.getTumorF(), normalReadPile.qualityScoreFilteredPileup);
+                candidate.setNormalArtifactLodTF(normalReadPile.getAltVsRef(normalArtifactGlTF, upRef, altAllele));
+
+                VariableAllelicRatioGenotypeLikelihoods normalArtifactGlLowTF = normalReadPile.calculateLikelihoods(candidate.getTumorFLowerBound(), normalReadPile.qualityScoreFilteredPileup);
+                candidate.setNormalArtifactLodTF(normalReadPile.getAltVsRef(normalArtifactGlLowTF, upRef, altAllele));
+
+                VariableAllelicRatioGenotypeLikelihoods normalArtifactGlNF = normalReadPile.calculateLikelihoods(candidate.getNormalF(), normalReadPile.qualityScoreFilteredPileup);
+                candidate.setNormalArtifactLodNF(normalReadPile.getAltVsRef(normalArtifactGlNF, upRef, altAllele));
 
                 candidate.setInitialNormalAltQualitySum(normQs.getQualitySum(altAllele));
                 candidate.setInitialNormalRefQualitySum(normQs.getQualitySum(upRef));
@@ -543,6 +573,18 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 VariableAllelicRatioGenotypeLikelihoods tumorFStarGl2 = t2.calculateLikelihoods(f2, t2.finalPileup);
                 candidate.setTumorLodFStar(tumorReadPile.getHetVsRef(tumorFStarGl2, upRef, altAllele));
                 candidate.setTumorF(f2);
+
+                // TODO: why extract the counts twice?  once above and once in this method...
+                tumorFLB = 0;
+                refCount = candidate.getInitialNormalRefCounts();
+                altCount = candidate.getInitialTumorAltCounts();
+                depth = refCount + altCount;
+                if ( depth > 0) {
+                    // implemented as shown http://www.sigmazone.com/binomial_confidence_interval.htm
+                    BetaDistribution dist = new BetaDistributionImpl(depth - altCount + 1, altCount);
+                    tumorFLB = 1 - dist.inverseCumulativeProbability(1 - (1-0.95)/2);
+                }
+                candidate.setTumorFLowerBound(tumorFLB);
 
                 //TODO: shouldn't this be f2 in the lod calculation instead of the strand specific f values?
                 ReadBackedPileup forwardPileup = t2.finalPileup.getPositiveStrandPileup();
@@ -923,7 +965,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 //            candidate.addRejectionReason("alt allele in normal");
 //        }
 
-        if (candidate.getNormalArtifactLod() > MTAC.NORMAL_ARTIFACT_LOD_THRESHOLD) {
+        if (candidate.getNormalArtifactLodNF() > MTAC.NORMAL_ARTIFACT_LOD_THRESHOLD) {
             candidate.addRejectionReason("normal_artifact_lod");
         }
 

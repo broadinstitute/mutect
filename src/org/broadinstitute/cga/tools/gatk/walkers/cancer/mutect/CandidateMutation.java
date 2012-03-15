@@ -61,6 +61,7 @@ public class CandidateMutation {
     private double initialNormalLod;
 
     private double tumorF;
+    private double tumorFLowerBound;
     private double tumorLodFStar;
     private double tumorLodFStarForward;
     private double tumorLodFStarReverse;
@@ -68,8 +69,14 @@ public class CandidateMutation {
     private double normalF;
     private double normalLodFStar;
 
-    private double normalArtifactPower;
-    private double normalArtifactLod;
+    private double normalArtifactPowerTF;
+    private double normalArtifactLodTF;
+
+    private double normalArtifactPowerLowTF;
+    private double normalArtifactLodLowTF;
+
+    private double normalArtifactPowerNF;
+    private double normalArtifactLodNF;
 
     private RankSumTest.Result tumorQualityRankSumTest;
     private RankSumTest.Result tumorReadPositionRankSumTest;
@@ -253,6 +260,14 @@ public class CandidateMutation {
 
     public void setTumorF(double tumorF) {
         this.tumorF = tumorF;
+    }
+
+    public double getTumorFLowerBound() {
+        return tumorFLowerBound;
+    }
+
+    public void setTumorFLowerBound(double tumorFLowerBound) {
+        this.tumorFLowerBound = tumorFLowerBound;
     }
 
     public double getNormalF() {
@@ -649,24 +664,56 @@ public class CandidateMutation {
         this.panelOfNormalsVC = panelOfNormalsVC;
     }
 
-    public double getNormalArtifactPower() {
-        return normalArtifactPower;
+    public double getNormalArtifactPowerTF() {
+        return normalArtifactPowerTF;
     }
 
-    public void setNormalArtifactPower(double normalArtifactPower) {
-        this.normalArtifactPower = normalArtifactPower;
+    public void setNormalArtifactPowerTF(double normalArtifactPowerTF) {
+        this.normalArtifactPowerTF = normalArtifactPowerTF;
     }
 
-    public double getNormalArtifactLod() {
-        return normalArtifactLod;
+    public double getNormalArtifactLodTF() {
+        return normalArtifactLodTF;
     }
 
-    public void setNormalArtifactLod(double normalArtifactLod) {
-        this.normalArtifactLod = normalArtifactLod;
+    public void setNormalArtifactLodTF(double normalArtifactLodTF) {
+        this.normalArtifactLodTF = normalArtifactLodTF;
     }
 
     public double getPowerToDetectPositiveStrandArtifact() {
         return powerToDetectPositiveStrandArtifact;
+    }
+
+    public double getNormalArtifactPowerLowTF() {
+        return normalArtifactPowerLowTF;
+    }
+
+    public void setNormalArtifactPowerLowTF(double normalArtifactPowerLowTF) {
+        this.normalArtifactPowerLowTF = normalArtifactPowerLowTF;
+    }
+
+    public double getNormalArtifactLodLowTF() {
+        return normalArtifactLodLowTF;
+    }
+
+    public void setNormalArtifactLodLowTF(double normalArtifactLodLowTF) {
+        this.normalArtifactLodLowTF = normalArtifactLodLowTF;
+    }
+
+    public double getNormalArtifactPowerNF() {
+        return normalArtifactPowerNF;
+    }
+
+    public void setNormalArtifactPowerNF(double normalArtifactPowerNF) {
+        this.normalArtifactPowerNF = normalArtifactPowerNF;
+    }
+
+    public double getNormalArtifactLodNF() {
+        return normalArtifactLodNF;
+    }
+
+    public void setNormalArtifactLodNF(double normalArtifactLodNF) {
+        this.normalArtifactLodNF = normalArtifactLodNF;
     }
 
     public void setPowerToDetectPositiveStrandArtifact(double powerToDetectPositiveStrandArtifact) {
