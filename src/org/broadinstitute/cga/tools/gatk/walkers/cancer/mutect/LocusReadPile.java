@@ -193,11 +193,15 @@ public class LocusReadPile {
         return lodAlt - lodRef;
     }
 
-    static public double calculateLogLikelihood(ReadBackedPileup pileup, byte ref, byte alt, double f) {
+    static public double calculateLogLikelihood(ReadBackedPileup pileup, byte ref, byte alt, double f, RecalibratedLocalQualityScores lqs) {
+
         double ll = 0;
         for(PileupElement pe : pileup) {
             byte base = pe.getBase();
             byte qual = pe.getQual();
+            if (lqs != null) {
+                qual = lqs.getQual(pe);
+            }
             double e = pow(10, (qual / -10.0));
 
             if (base == ref) {
@@ -210,6 +214,10 @@ public class LocusReadPile {
 
         }
         return ll;
+    }
+
+    static public double calculateLogLikelihood(ReadBackedPileup pileup, byte ref, byte alt, double f) {
+        return calculateLogLikelihood(pileup, ref, alt, f, null);
     }
 
     public VariableAllelicRatioGenotypeLikelihoods calculateLikelihoods(ReadBackedPileup pileup) {

@@ -78,6 +78,10 @@ public class CandidateMutation {
     private double normalArtifactPowerNF;
     private double normalArtifactLodNF;
 
+    private double normalGlobalQualityReferenceLL;
+    private double normalLocalQualityReferenceLL;
+    private double normalQualityModelLod;
+
     private RankSumTest.Result tumorQualityRankSumTest;
     private RankSumTest.Result tumorReadPositionRankSumTest;
     private Map<Integer, Double> classicSkewScoresAndOffsets;
@@ -742,6 +746,30 @@ public class CandidateMutation {
 
     public void setNormalPowerNoSNPPrior(double normalPowerNoSNPPrior) {
         this.normalPowerNoSNPPrior = normalPowerNoSNPPrior;
+    }
+
+    public double getNormalGlobalQualityReferenceLL() {
+        return normalGlobalQualityReferenceLL;
+    }
+
+    public void setNormalGlobalQualityReferenceLL(double normalGlobalQualityReferenceLL) {
+        this.normalGlobalQualityReferenceLL = normalGlobalQualityReferenceLL;
+    }
+
+    public double getNormalLocalQualityReferenceLL() {
+        return normalLocalQualityReferenceLL;
+    }
+
+    public void setNormalLocalQualityReferenceLL(double normalLocalQualityReferenceLL) {
+        this.normalLocalQualityReferenceLL = normalLocalQualityReferenceLL;
+    }
+
+    public double getNormalQualityModelLod() {
+        return normalQualityModelLod;
+    }
+
+    public void setNormalQualityModelLod(double normalQualityModelLod) {
+        this.normalQualityModelLod = normalQualityModelLod;
     }
 }
 

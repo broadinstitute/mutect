@@ -518,6 +518,15 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setNormalArtifactPowerNF(this.normalArtifactPowerCalculator.cachingPowerCalculation(normalBaseCount, candidate.getNormalF()));
 
 
+                // compare the local and global error models
+                RecalibratedLocalQualityScores lqs = new RecalibratedLocalQualityScores((byte) upRef, normalReadPile.finalPileup);
+                double lodOriginalQualities = LocusReadPile.calculateLogLikelihood(normalReadPile.finalPileup, (byte) upRef, (byte) altAllele, 0.0);
+                double lodLqs = LocusReadPile.calculateLogLikelihood(normalReadPile.finalPileup, (byte) upRef, (byte) altAllele, 0.0, lqs);
+                double qLod = lodLqs - lodOriginalQualities;
+                candidate.setNormalGlobalQualityReferenceLL(lodOriginalQualities);
+                candidate.setNormalLocalQualityReferenceLL(lodLqs);
+                candidate.setNormalQualityModelLod(qLod);
+
                 VariableAllelicRatioGenotypeLikelihoods normalArtifactGlTF = normalReadPile.calculateLikelihoods(candidate.getTumorF(), normalReadPile.qualityScoreFilteredPileup);
                 candidate.setNormalArtifactLodTF(normalReadPile.getAltVsRef(normalArtifactGlTF, upRef, altAllele));
 

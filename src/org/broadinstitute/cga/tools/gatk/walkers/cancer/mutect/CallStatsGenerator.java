@@ -32,6 +32,7 @@ public class CallStatsGenerator {
                 "tumor_alt_fpir_median", "tumor_alt_fpir_mad","tumor_alt_rpir_median","tumor_alt_rpir_mad","alt_fpir","alt_rpir",
                 "powered_filters",
                 "normal_artifact_power_tf", "normal_artifact_power_low_tf", "normal_artifact_power_nf",
+                "normal_global_qll", "normal_local_qll", "normal_qmodel_lod",
                 "observed_in_normals_count", "failure_reasons","judgement"
             };
 
@@ -193,6 +194,9 @@ public class CallStatsGenerator {
                         format(candidate.getNormalArtifactPowerTF()),
                         format(candidate.getNormalArtifactPowerLowTF()),
                         format(candidate.getNormalArtifactPowerNF()),
+                        format(candidate.getNormalGlobalQualityReferenceLL()),
+                        format(candidate.getNormalLocalQualityReferenceLL()),
+                        format(candidate.getNormalQualityModelLod()),
                         format(candidate.getCountOfNormalsObservedIn()),
                         StringUtil.join(",", candidate.getRejectionReasons().toArray(new String[]{})),
                         keepString
