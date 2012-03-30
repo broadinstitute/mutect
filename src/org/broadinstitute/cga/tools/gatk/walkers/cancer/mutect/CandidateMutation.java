@@ -58,6 +58,7 @@ public class CandidateMutation {
     private DiploidGenotype initialNormalBestGenotype;
 
     private double initialTumorLod;
+    private double tumorLodLQS;
     private double initialNormalLod;
 
     private double tumorF;
@@ -770,6 +771,14 @@ public class CandidateMutation {
 
     public void setNormalQualityModelLod(double normalQualityModelLod) {
         this.normalQualityModelLod = normalQualityModelLod;
+    }
+
+    public double getTumorLodLQS() {
+        return tumorLodLQS;
+    }
+
+    public void setTumorLodLQS(double tumorLodLQS) {
+        this.tumorLodLQS = tumorLodLQS;
     }
 }
 

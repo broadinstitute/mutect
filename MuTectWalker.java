@@ -583,6 +583,9 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setTumorLodFStar(tumorReadPile.getHetVsRef(tumorFStarGl2, upRef, altAllele));
                 candidate.setTumorF(f2);
 
+                // calculate Tumor LOD with the local quality score
+                candidate.setTumorLodLQS(t2.calculateLOD((byte)altAllele, f2, 0, lqs));
+
                 // TODO: why extract the counts twice?  once above and once in this method...
                 tumorFLB = 0;
                 refCount = candidate.getInitialNormalRefCounts();
@@ -605,6 +608,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 double f2reverse = LocusReadPile.estimateAlleleFraction(reversePileup, upRef, altAllele);
                 VariableAllelicRatioGenotypeLikelihoods tumorFStarGl2Reverse = t2.calculateLikelihoods(f2reverse, reversePileup);
                 candidate.setTumorLodFStarReverse(tumorReadPile.getHetVsRef(tumorFStarGl2Reverse, upRef, altAllele));
+
 
 
                 // calculate strand bias power

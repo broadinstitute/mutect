@@ -188,8 +188,12 @@ public class LocusReadPile {
     }
 
     public double calculateLOD(byte alt, double fAlternate, double fReference) {
-        double lodAlt = LocusReadPile.calculateLogLikelihood(this.finalPileup, ((byte) this.refBase), alt, fAlternate);
-        double lodRef = LocusReadPile.calculateLogLikelihood(this.finalPileup, ((byte) this.refBase), alt, fReference);
+        return calculateLOD(alt, fAlternate, fReference, null);
+    }
+
+    public double calculateLOD(byte alt, double fAlternate, double fReference, RecalibratedLocalQualityScores lqs) {
+        double lodAlt = LocusReadPile.calculateLogLikelihood(this.finalPileup, ((byte) this.refBase), alt, fAlternate, lqs);
+        double lodRef = LocusReadPile.calculateLogLikelihood(this.finalPileup, ((byte) this.refBase), alt, fReference, lqs);
         return lodAlt - lodRef;
     }
 
