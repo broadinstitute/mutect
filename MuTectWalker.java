@@ -273,8 +273,6 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
             // only process bases where the reference is [ACGT], because the FASTA for HG18 has N,M and R!
             if (upRef != 'A' && upRef != 'C' && upRef != 'G' && upRef != 'T') {
-//                final String msg = "FAILED non-ACGT reference.  Reference was " + upRef;
-//                writeCallStats(CallStatsVerbosity.MINOR, rawContext, msg);
                 return -1;
             }
 
@@ -319,7 +317,6 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 tumorPileup = tumorPileup.getPileupForSample(MTAC.BAM_TUMOR_SAMPLE_NAME);
             }
 
-            // TODO: do this filtering much earlier so that in the simulation we are drawing from reads that will pass this filter!
             final LocusReadPile tumorReadPile = new LocusReadPile(tumorPileup, upRef, MTAC.MIN_QSCORE, MIN_QSUM_QSCORE, false, MTAC.ARTIFACT_DETECTION_MODE);
             final LocusReadPile normalReadPile = new LocusReadPile(normalPileup, upRef, MTAC.MIN_QSCORE, 0, this.USE_MAPQ0_IN_NORMAL_QSCORE, true);
 
@@ -440,26 +437,14 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setTumorFLowerBound(tumorFLB);
 
 
-                VariableAllelicRatioGenotypeLikelihoods tumorGl = tumorReadPile.calculateLikelihoods(tumorReadPile.finalPileup);
-                candidate.setInitialTumorLod(tumorReadPile.getAltVsRef(tumorGl, upRef, altAllele));
+                double tumorLod = tumorReadPile.calculateAltVsRefLOD((byte)altAllele, candidate.getTumorF(), 0);
+                candidate.setTumorLodFStar(tumorLod);
+
                 candidate.setInitialTumorReadDepth(tumorReadPile.finalPileupReads.size());
-
-                VariableAllelicRatioGenotypeLikelihoods tumorFStarGl = tumorReadPile.calculateLikelihoods(candidate.getTumorF(), tumorReadPile.finalPileup);
-                candidate.setTumorLodFStar(tumorReadPile.getHetVsRef(tumorFStarGl, upRef, altAllele));
-
-                double newLod = tumorReadPile.calculateLOD((byte)altAllele, candidate.getTumorF(), 0);
-                if (Math.abs(newLod - candidate.getTumorLodFStar()) > 0.001) {
-                    throw new RuntimeException(String.format("Error in LOD calculations -- new %6.6f vs old %6.6f ", newLod, candidate.getTumorLodFStar() ));
-                }
-
                 candidate.setTumorInsertionCount(tumorReadPile.getInsertionsCount());
                 candidate.setTumorDeletionCount(tumorReadPile.getDeletionsCount());
 
-                if (candidate.getInitialTumorLod() >= MTAC.INITIAL_TUMOR_LOD_THRESHOLD ||
-                    candidate.getTumorLodFStar() >= MTAC.INITIAL_TUMOR_FSTAR_LOD_THRESHOLD ) {
-
-                        // if only Java had "unless" and I didn't hate deMorgan's so much...
-                } else {
+                if (candidate.getTumorLodFStar() < MTAC.INITIAL_TUMOR_LOD_THRESHOLD ) {
                     continue;
                 }
 
@@ -502,14 +487,16 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 //      LOD score for ref:ref vs mutant:ref + mutant:mutant must be at least 2.3.
                 final QualitySums normQs = normalReadPile.qualitySums;
 
+                
                 VariableAllelicRatioGenotypeLikelihoods normalGl = normalReadPile.calculateLikelihoods(normalReadPile.qualityScoreFilteredPileup); // use MAPQ0 reads
                 candidate.setInitialNormalBestGenotype(normalReadPile.getBestGenotype(normalGl));
                 candidate.setInitialNormalLod(LocusReadPile.getRefVsAlt(normalGl, upRef, altAllele));
 
+// /                candidate.setInitialNormalLod(normalReadPile.calculateRefVsAltLOD(normalReadPile.qualityScoreFilteredPileup, (byte)altAllele, 0.5, 0.0));
+
                 double normalF = Math.max(normalReadPile.estimateAlleleFraction(normalReadPile.qualityScoreFilteredPileup, upRef, altAllele), MTAC.MINIMUM_NORMAL_ALLELE_FRACTION);
                 candidate.setNormalF(normalF);
-                VariableAllelicRatioGenotypeLikelihoods normalFStarGl = normalReadPile.calculateLikelihoods(normalF, normalReadPile.qualityScoreFilteredPileup);
-                candidate.setNormalLodFStar(normalReadPile.getRefVsHet(normalFStarGl, upRef, altAllele));
+                candidate.setNormalLodFStar(normalReadPile.calculateRefVsAltLOD(normalReadPile.qualityScoreFilteredPileup, (byte)altAllele, normalF, 0.0));
 
 
                 // calculate power to have detected this artifact in the normal
@@ -578,13 +565,12 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setInitialTumorLod(t2.getAltVsRef(t2Gl, upRef, altAllele));
                 candidate.setInitialTumorReadDepth(t2.finalPileupReads.size());
 
-                double f2 = t2.estimateAlleleFraction(upRef, altAllele);
-                VariableAllelicRatioGenotypeLikelihoods tumorFStarGl2 = t2.calculateLikelihoods(f2, t2.finalPileup);
-                candidate.setTumorLodFStar(tumorReadPile.getHetVsRef(tumorFStarGl2, upRef, altAllele));
-                candidate.setTumorF(f2);
+                candidate.setTumorF(t2.estimateAlleleFraction(upRef, altAllele));
+                double tumorLod2 = t2.calculateAltVsRefLOD((byte)altAllele, candidate.getTumorF(), 0);
+                candidate.setTumorLodFStar(tumorLod2);
 
                 // calculate Tumor LOD with the local quality score
-                candidate.setTumorLodLQS(t2.calculateLOD((byte)altAllele, f2, 0, lqs));
+                candidate.setTumorLodLQS(t2.calculateAltVsRefLOD((byte)altAllele, candidate.getTumorF(), 0, lqs));
 
                 // TODO: why extract the counts twice?  once above and once in this method...
                 tumorFLB = 0;
@@ -601,13 +587,11 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 //TODO: shouldn't this be f2 in the lod calculation instead of the strand specific f values?
                 ReadBackedPileup forwardPileup = t2.finalPileup.getPositiveStrandPileup();
                 double f2forward = LocusReadPile.estimateAlleleFraction(forwardPileup, upRef, altAllele);
-                VariableAllelicRatioGenotypeLikelihoods tumorFStarGl2Forward = t2.calculateLikelihoods(f2forward, forwardPileup);
-                candidate.setTumorLodFStarForward(tumorReadPile.getHetVsRef(tumorFStarGl2Forward, upRef, altAllele));
+                candidate.setTumorLodFStarForward(t2.calculateAltVsRefLOD(forwardPileup, (byte)altAllele, f2forward, 0.0, null));
 
                 ReadBackedPileup reversePileup = t2.finalPileup.getNegativeStrandPileup();
                 double f2reverse = LocusReadPile.estimateAlleleFraction(reversePileup, upRef, altAllele);
-                VariableAllelicRatioGenotypeLikelihoods tumorFStarGl2Reverse = t2.calculateLikelihoods(f2reverse, reversePileup);
-                candidate.setTumorLodFStarReverse(tumorReadPile.getHetVsRef(tumorFStarGl2Reverse, upRef, altAllele));
+                candidate.setTumorLodFStarReverse(t2.calculateAltVsRefLOD(reversePileup, (byte)altAllele, f2reverse, 0.0, null));
 
 
 
@@ -655,19 +639,6 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setTumorAltForwardOffsetsInRead(getForwardOffsetsInRead(mutantPileup));
                 candidate.setTumorAltReverseOffsetsInRead(getReverseOffsetsInRead(mutantPileup));
 
-
-
-//                candidate.setClassicSkewScoresAndOffsets(
-//                    performClassicMisalignmentTest(refPile, mutantPile, rawContext.getContig(), rawContext.getPosition(), refGATKString, refStart, MIN_QSCORE)
-//                );
-//
-//                candidate.setFisherSkewScoresAndOffsets(
-//                    performFisherMisalignmentTest(refPile, mutantPile, rawContext.getContig(), rawContext.getPosition(), refGATKString, refStart, MIN_QSCORE)
-//                );
-
-                //candidate.setClippingBias(calculateClippingBias(refPile, mutantPile));
-
-
                 if (candidate.getTumorAltForwardOffsetsInRead().size() > 0) {
                     double[] offsets = convertIntegersToDoubles(candidate.getTumorAltForwardOffsetsInRead());
                     double median = getMedian(offsets);
@@ -691,6 +662,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 if (MTAC.FORCE_ALLELES) {
                     out.println(csOutput);
                 } else {
+//                    System.out.println("putting in " + altAllele + " with lod " + candidate.getInitialTumorLod());
                     messageByTumorLod.put(candidate.getInitialTumorLod(), csOutput);
                 }
             }

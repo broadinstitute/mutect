@@ -177,8 +177,8 @@ public class LocusReadPile {
 
     public static double estimateAlleleFraction(ReadBackedPileup pileup, char ref, char alt) {
         int[] counts = pileup.getBaseCounts();
-        double refCount = (double) counts[BaseUtils.simpleBaseToBaseIndex(ref)];
-        double altCount = (double) counts[BaseUtils.simpleBaseToBaseIndex(alt)];
+        double refCount = (double) counts[BaseUtils.simpleBaseToBaseIndex((byte)ref)];
+        double altCount = (double) counts[BaseUtils.simpleBaseToBaseIndex((byte)alt)];
         double depth = refCount + altCount;
         return (depth==0)?0:(altCount / depth);
     }
@@ -187,14 +187,28 @@ public class LocusReadPile {
         return LocusReadPile.calculateLogLikelihood(this.finalPileup, ((byte) this.refBase), alt, f);
     }
 
-    public double calculateLOD(byte alt, double fAlternate, double fReference) {
-        return calculateLOD(alt, fAlternate, fReference, null);
+    public double calculateAltVsRefLOD(byte alt, double fAlternate, double fReference) {
+        return calculateAltVsRefLOD(alt, fAlternate, fReference, null);
     }
 
-    public double calculateLOD(byte alt, double fAlternate, double fReference, RecalibratedLocalQualityScores lqs) {
-        double lodAlt = LocusReadPile.calculateLogLikelihood(this.finalPileup, ((byte) this.refBase), alt, fAlternate, lqs);
-        double lodRef = LocusReadPile.calculateLogLikelihood(this.finalPileup, ((byte) this.refBase), alt, fReference, lqs);
+    public double calculateAltVsRefLOD(ReadBackedPileup pileup, byte alt, double fAlternate, double fReference, RecalibratedLocalQualityScores lqs) {
+        double lodAlt = LocusReadPile.calculateLogLikelihood(pileup, ((byte) this.refBase), alt, fAlternate, lqs);
+        double lodRef = LocusReadPile.calculateLogLikelihood(pileup, ((byte) this.refBase), alt, fReference, lqs);
         return lodAlt - lodRef;
+    }
+
+    public double calculateAltVsRefLOD(byte alt, double fAlternate, double fReference, RecalibratedLocalQualityScores lqs) {
+        return calculateAltVsRefLOD(this.finalPileup, alt, fAlternate, fReference, lqs);
+    }
+
+
+
+    public double calculateRefVsAltLOD(ReadBackedPileup pileup, byte alt, double fAlternate, double fReference) {
+        return calculateRefVsAltLOD(pileup, alt, fAlternate, fReference, null);
+    }
+
+    public double calculateRefVsAltLOD(ReadBackedPileup pileup, byte alt, double fAlternate, double fReference, RecalibratedLocalQualityScores lqs) {
+        return -1*calculateAltVsRefLOD(pileup, alt, fAlternate, fReference, lqs);
     }
 
     static public double calculateLogLikelihood(ReadBackedPileup pileup, byte ref, byte alt, double f, RecalibratedLocalQualityScores lqs) {

@@ -41,10 +41,7 @@ public class MuTectArgumentCollection {
     public boolean FORCE_ALLELES = false;
 
     @Argument(fullName = "initial_tumor_lod", required = false, doc = "Initial LOD threshold for calling tumor variant")
-    public float INITIAL_TUMOR_LOD_THRESHOLD = 6.3f;
-
-    @Argument(fullName = "initial_tumor_fstar_lod", required = false, doc = "Initial F-star LOD threshold for calling tumor variant")
-    public float INITIAL_TUMOR_FSTAR_LOD_THRESHOLD = 4.0f;
+    public float INITIAL_TUMOR_LOD_THRESHOLD = 4.0f;
 
     @Argument(fullName = "tumor_lod", required = false, doc = "LOD threshold for calling tumor variant")
     public float TUMOR_LOD_THRESHOLD = 6.3f;
