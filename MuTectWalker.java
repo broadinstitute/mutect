@@ -407,9 +407,8 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setPanelOfNormalsVC(panelOfNormalsVC.isEmpty()?null:panelOfNormalsVC.iterator().next());
                 candidate.setCosmicSite(!cosmicVC.isEmpty());
                 candidate.setDbsnpSite(!dbsnpVC.isEmpty());
+                candidate.setTumorF(tumorReadPile.estimateAlleleFraction(upRef, altAllele));
 
-
-                
                 if (!MTAC.FORCE_OUTPUT && candidate.getTumorF() < MTAC.TUMOR_F_PRETEST) {
                     continue;
                 }
@@ -424,7 +423,6 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setInitialTumorRefQualitySum(tumorReadPile.qualitySums.getQualitySum(upRef));
 
                 // TODO: why extract the counts twice?  once above and once in this method...
-                candidate.setTumorF(tumorReadPile.estimateAlleleFraction(upRef, altAllele));
                 double tumorFLB = 0;
                 int refCount = candidate.getInitialTumorRefCounts();
                 int altCount = candidate.getInitialTumorAltCounts();
