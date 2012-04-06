@@ -1103,7 +1103,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             }
 
             // if we're here... we passed all the read filters!
-            newPileupElements.add(new PileupElement(read, p.getOffset(), p.isDeletion(), p.isBeforeDeletion(), p.isAfterDeletion(), p.isBeforeInsertion(), p.isAfterInsertion(),p.isNextToSoftClip()));
+            newPileupElements.add(new PileupElement(read, p.getOffset(), p.isDeletion(), p.isBeforeDeletionStart(), p.isAfterDeletionEnd(), p.isBeforeInsertion(), p.isAfterInsertion(),p.isNextToSoftClip()));
 
 
         }
