@@ -68,6 +68,8 @@ public class CandidateMutation {
     private double tumorLodFStarReverse;
 
     private double normalF;
+    private double normalFQuals;
+
     private double normalLodFStar;
 
     private double normalArtifactPowerTF;
@@ -78,6 +80,8 @@ public class CandidateMutation {
 
     private double normalArtifactPowerNF;
     private double normalArtifactLodNF;
+
+    private double normalArtifactLodNFQ;
 
     private double normalGlobalQualityReferenceLL;
     private double normalLocalQualityReferenceLL;
@@ -779,6 +783,22 @@ public class CandidateMutation {
 
     public void setTumorLodLQS(double tumorLodLQS) {
         this.tumorLodLQS = tumorLodLQS;
+    }
+
+    public double getNormalFQuals() {
+        return normalFQuals;
+    }
+
+    public void setNormalFQuals(double normalFQuals) {
+        this.normalFQuals = normalFQuals;
+    }
+
+    public double getNormalArtifactLodNFQ() {
+        return normalArtifactLodNFQ;
+    }
+
+    public void setNormalArtifactLodNFQ(double normalArtifactLodNFQ) {
+        this.normalArtifactLodNFQ = normalArtifactLodNFQ;
     }
 }
 

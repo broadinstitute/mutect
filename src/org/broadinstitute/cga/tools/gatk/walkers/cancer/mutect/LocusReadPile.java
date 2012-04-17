@@ -183,6 +183,34 @@ public class LocusReadPile {
         return (depth==0)?0:(altCount / depth);
     }
 
+    public static double estimateAlleleFractionUsingQuals(ReadBackedPileup pileup, byte ref, byte alt) {
+        // in this case, the true allele fraction is modulated by the base qualities in a two base model
+        // since the other two bases could go to either ref or alt they will cancel out
+         
+
+        // helps in cases where the alts are very low quality and the refs are high quality
+        double refOrAltCount = 0;
+        double altCount = 0;
+        for(PileupElement pe : pileup) {
+            // TODO: cache this...
+        
+            double e = Math.pow(10, -1 * pe.getQual()/10);
+
+            // each REF could really be an ALT with a probability of e/3 and
+            if (pe.getBase() == ref) { 
+                altCount += e/3;
+                refOrAltCount++;
+
+            // each ALT could really a different base with a probability of e/3.
+            } else if (pe.getBase() == alt) {
+                altCount += (1 - e);
+                refOrAltCount++;
+            }
+        }
+
+        return (refOrAltCount==0)?0:(altCount / refOrAltCount);
+    }
+
     public double calculateLogLikelihood(byte alt, double f) {
         return LocusReadPile.calculateLogLikelihood(this.finalPileup, ((byte) this.refBase), alt, f);
     }

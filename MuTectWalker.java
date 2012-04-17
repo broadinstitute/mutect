@@ -521,6 +521,11 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 VariableAllelicRatioGenotypeLikelihoods normalArtifactGlNF = normalReadPile.calculateLikelihoods(candidate.getNormalF(), normalReadPile.qualityScoreFilteredPileup);
                 candidate.setNormalArtifactLodNF(normalReadPile.getAltVsRef(normalArtifactGlNF, upRef, altAllele));
 
+                candidate.setNormalFQuals(LocusReadPile.estimateAlleleFractionUsingQuals(normalReadPile.qualityScoreFilteredPileup, (byte)upRef, (byte)altAllele));
+                VariableAllelicRatioGenotypeLikelihoods normalArtifactGlNFQ = normalReadPile.calculateLikelihoods(candidate.getNormalFQuals(), normalReadPile.qualityScoreFilteredPileup);
+                candidate.setNormalArtifactLodNFQ(normalReadPile.getAltVsRef(normalArtifactGlNFQ, upRef, altAllele));
+
+
                 candidate.setInitialNormalAltQualitySum(normQs.getQualitySum(altAllele));
                 candidate.setInitialNormalRefQualitySum(normQs.getQualitySum(upRef));
 
@@ -680,6 +685,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
 
     private String createSequenceContext(ReferenceContext ref, int size) {
+        // TODO: what if we are on the first/last base of a contig and can't get the context?
         // create a context of 3 bases before, then 'x' then three bases after
         int offset = ref.getLocus().getStart() - ref.getWindow().getStart();
         StringBuilder sb = new StringBuilder(7);
