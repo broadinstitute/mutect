@@ -577,7 +577,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
                 // TODO: why extract the counts twice?  once above and once in this method...
                 tumorFLB = 0;
-                refCount = candidate.getInitialNormalRefCounts();
+                refCount = candidate.getInitialTumorRefCounts();
                 altCount = candidate.getInitialTumorAltCounts();
                 depth = refCount + altCount;
                 if ( altCount > 0) {
@@ -950,13 +950,13 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             candidate.addRejectionReason("normal_lod");
         }
 
-//        if ( (candidate.getInitialNormalAltCounts() >= MAX_ALT_ALLELES_IN_NORMAL_COUNT && candidate.getInitialNormalAltQualitySum() > MAX_ALT_ALLELES_IN_NORMAL_QSCORE_SUM && candidate.getNormalF() > MAX_ALT_ALLELE_IN_NORMAL_FRACTION)) {
-//            candidate.addRejectionReason("alt allele in normal");
-//        }
-
-        if (candidate.getNormalArtifactLodNF() > MTAC.NORMAL_ARTIFACT_LOD_THRESHOLD) {
-            candidate.addRejectionReason("normal_artifact_lod");
+        if ( (candidate.getInitialNormalAltCounts() >= MTAC.MAX_ALT_ALLELES_IN_NORMAL_COUNT && candidate.getInitialNormalAltQualitySum() > MTAC.MAX_ALT_ALLELES_IN_NORMAL_QSCORE_SUM && candidate.getNormalF() > MTAC.MAX_ALT_ALLELE_IN_NORMAL_FRACTION)) {
+            candidate.addRejectionReason("alt_allele_in_normal");
         }
+
+//        if (candidate.getNormalArtifactLodNF() > MTAC.NORMAL_ARTIFACT_LOD_THRESHOLD) {
+//            candidate.addRejectionReason("normal_artifact_lod");
+//        }
 
         if ( (candidate.getTumorForwardOffsetsInReadMedian() != null && candidate.getTumorForwardOffsetsInReadMedian() <= MTAC.PIR_MEDIAN_THRESHOLD && candidate.getTumorForwardOffsetsInReadMad() != null && candidate.getTumorForwardOffsetsInReadMad() <= MTAC.PIR_MAD_THRESHOLD) ||
               candidate.getTumorReverseOffsetsInReadMedian() != null && candidate.getTumorReverseOffsetsInReadMedian() <= MTAC.PIR_MEDIAN_THRESHOLD && candidate.getTumorReverseOffsetsInReadMad() != null && candidate.getTumorReverseOffsetsInReadMad() <= MTAC.PIR_MAD_THRESHOLD ) {

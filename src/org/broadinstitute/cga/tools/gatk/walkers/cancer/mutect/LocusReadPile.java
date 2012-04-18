@@ -201,7 +201,7 @@ public class LocusReadPile {
                 altCount += e/3;
                 refOrAltCount++;
 
-            // each ALT could really a different base with a probability of e/3.
+            // each ALT could really a different base with a probability of e.
             } else if (pe.getBase() == alt) {
                 altCount += (1 - e);
                 refOrAltCount++;
