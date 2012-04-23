@@ -106,7 +106,7 @@ public class MuTectArgumentCollection {
     public int MAX_ALT_ALLELES_IN_NORMAL_QSCORE_SUM = 20;
 
     @Argument(fullName = "max_alt_allele_in_normal_fraction", required = false, doc="threshold for maximum alternate allele fraction in normal")
-    public double MAX_ALT_ALLELE_IN_NORMAL_FRACTION = 0.00;
+    public double MAX_ALT_ALLELE_IN_NORMAL_FRACTION = 0.03;
 
     @Argument(fullName="power_constant_qscore", doc="Phred scale quality score constant to use in power calculations", required=false)
     public int POWER_CONSTANT_QSCORE = 30;

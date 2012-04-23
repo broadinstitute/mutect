@@ -950,7 +950,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             candidate.addRejectionReason("normal_lod");
         }
 
-        if ( (candidate.getInitialNormalAltCounts() >= MTAC.MAX_ALT_ALLELES_IN_NORMAL_COUNT && candidate.getInitialNormalAltQualitySum() > MTAC.MAX_ALT_ALLELES_IN_NORMAL_QSCORE_SUM && candidate.getNormalF() > MTAC.MAX_ALT_ALLELE_IN_NORMAL_FRACTION)) {
+        if ( (candidate.getInitialNormalAltCounts() >= MTAC.MAX_ALT_ALLELES_IN_NORMAL_COUNT || candidate.getNormalF() >= MTAC.MAX_ALT_ALLELE_IN_NORMAL_FRACTION ) && candidate.getInitialNormalAltQualitySum() > MTAC.MAX_ALT_ALLELES_IN_NORMAL_QSCORE_SUM) {
             candidate.addRejectionReason("alt_allele_in_normal");
         }
 
