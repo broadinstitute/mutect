@@ -899,9 +899,12 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             // TODO: maybe we should be doing start-site distribution, or a clipping aware offset?
                 GATKSAMRecord r = pe.getRead();
 
+
                 positions.add(
-                        Math.abs((int)(p.getLocation().getStart() -
-                                (useForwardOffsets?r.getOriginalAlignmentStart():r.getOriginalAlignmentEnd())))
+                        Math.abs((int)(p.getLocation().getStart() - (useForwardOffsets?pe.getRead().getAlignmentStart():pe.getRead().getAlignmentEnd())))
+// TODO: the following code was for handling reduced reads, but if you use it on non-reduced reads it returns the wrong thing AND there is no way to tell if this is a reduced read!
+//                        Math.abs((int)(p.getLocation().getStart() -
+//                                (useForwardOffsets?r.getOriginalAlignmentStart():r.getOriginalAlignmentEnd())))
                 );
         }
 
