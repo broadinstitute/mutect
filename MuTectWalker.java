@@ -37,6 +37,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
     public static final int REFERENCE_HALF_WINDOW_LENGTH = 150;
     public static final String BAM_TAG_TUMOR = "tumor";
     public static final String BAM_TAG_NORMAL = "normal";
+    public static final String BAM_TAG_CONTROL = "control";
 
     // DO NOT CHANGE THIS LINE!  It's the SVN revision number of the caller, which updates automatically!
     private static final String VERSION = "$Rev$";
@@ -140,6 +141,8 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
 
     private Set<SAMReaderID> tumorSAMReaderIDs = new HashSet<SAMReaderID>();
+    private Set<SAMReaderID> normalSAMReaderIDs = new HashSet<SAMReaderID>();
+    private Set<SAMReaderID> controlSAMReaderIDs = new HashSet<SAMReaderID>();
 
     private CallStatsGenerator callStatsGenerator;
 
@@ -156,7 +159,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
         // check that we have at least one tumor bam
         for(SAMReaderID id : getToolkit().getReadsDataSource().getReaderIDs()) {
             if (id.getTags().getPositionalTags().size() == 0) {
-                throw new RuntimeException("BAMs must be tagged as either 'tumor' or 'normal'");
+                throw new RuntimeException("BAMs must be tagged as either 'tumor','normal' or 'control'");
             }
 
             for(String tag : id.getTags().getPositionalTags()) {
@@ -177,6 +180,8 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                     }
                 } else if (BAM_TAG_NORMAL.equalsIgnoreCase(tag)) {
                     hasNormalBam = true;
+                    normalSAMReaderIDs.add(id);
+
 
                     // fill in the sample name if necessary
                     if (MTAC.NORMAL_SAMPLE_NAME == null) {
@@ -190,8 +195,10 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                             MTAC.NORMAL_SAMPLE_NAME = "normal";
                         }
                     }
+                } else if (BAM_TAG_CONTROL.equalsIgnoreCase(tag)) {                    
+                    controlSAMReaderIDs.add(id);
                 } else {
-                    throw new RuntimeException("Unknown BAM tag '" + tag + "' must be either 'tumor' or 'normal'");
+                    throw new RuntimeException("Unknown BAM tag '" + tag + "' must be either 'tumor','normal' or 'control'");
                 }                
             }
         }
@@ -200,6 +207,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             throw new RuntimeException("At least one BAM tagged as 'tumor' required");
         }
 
+        // FIXME: update for Control BAM concept
         if (!hasNormalBam) {
             MTAC.NORMAL_LOD_THRESHOLD = -1 * Float.MAX_VALUE;
             MTAC.NORMAL_DBSNP_LOD_THRESHOLD = -1 * Float.MAX_VALUE;
@@ -276,8 +284,9 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 return -1;
             }
 
-            ArrayList<PileupElement> normalPileupElements = new ArrayList<PileupElement>();
             ArrayList<PileupElement> tumorPileupElements = new ArrayList<PileupElement>();
+            ArrayList<PileupElement> normalPileupElements = new ArrayList<PileupElement>();
+            ArrayList<PileupElement> controlPileupElements = new ArrayList<PileupElement>();
 
             int totalPairs = 0;
             int improperPairs = 0;
@@ -300,10 +309,13 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
 
                 // Add the read to the appropriate pile of reads
-                if (isTumorRead(p.getRead())) {
+                ReadSource source = getReadSource(p.getRead());
+                if (source == ReadSource.Tumor) {
                     tumorPileupElements.add(p);
-                } else {
+                } else if (source == ReadSource.Normal) {
                     normalPileupElements.add(p);
+                } else if (source == ReadSource.Control) {
+                    controlPileupElements.add(p);
                 }
             }
 
@@ -685,15 +697,15 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
 
     private String createSequenceContext(ReferenceContext ref, int size) {
-        // TODO: what if we are on the first/last base of a contig and can't get the context?
         // create a context of 3 bases before, then 'x' then three bases after
         int offset = ref.getLocus().getStart() - ref.getWindow().getStart();
         StringBuilder sb = new StringBuilder(7);
-        for(byte b : Arrays.copyOfRange(ref.getBases(), offset - size, offset)) {
+
+        for(byte b : Arrays.copyOfRange(ref.getBases(), Math.max(0,offset - size), offset)) {
             sb.append(Character.toUpperCase((char)b));
         }
         sb.append('x');
-        for(byte b : Arrays.copyOfRange(ref.getBases(), offset + 1, offset + 1 + size)) {
+        for(byte b : Arrays.copyOfRange(ref.getBases(), offset + 1, Math.min(ref.getBases().length,offset + 1 + size))) {
             sb.append(Character.toUpperCase((char)b));
         }
         return sb.toString();
@@ -1014,6 +1026,36 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.addRejectionReason("seen_in_panel_of_normals");
             }
         }
+
+
+        /*
+        String judgementString = "REJECT";
+        if (!candidate.isRejected()) {
+            // now that we know it's a good event in the tumor, is it SOMATIC / GERMLINE or VARIANT?
+
+            double nLodThreshold = (candidate.isGermlineAtRisk())?MTAC.NORMAL_DBSNP_LOD_THRESHOLD:MTAC.NORMAL_LOD_THRESHOLD;
+            double nPower = (candidate.isGermlineAtRisk())?candidate.getNormalPowerWithSNPPrior():candidate.getNormalPowerNoSNPPrior();
+
+
+            // if we passed the Normal LOD threshold, it's somatic.  If we didn't it's either germline (if we
+            // had power to have passed the threshold and only germline expected filters ) or just variant
+            if (candidate.getInitialNormalLod() >= nLodThreshold) {
+                judgementString = "KEEP";
+            } else {
+
+                if (nPower >= MTAC.SOMATIC_CLASSIFICATION_NORMAL_POWER_THRESHOLD) {
+                    // this is "GERMLINE" in the paper, but calling it out as GERMLINE
+                    // might make people think that we are trying to call germline variants
+                    // well (which we are not) so we just REJECT it
+                    candidate.addRejectionReason("normal_lod");
+                    judgementString = "REJECT";
+                } else {
+                    judgementString = "VARIANT";
+                }
+            }
+        }
+        candidate.setJudgement(judgementString);
+        */
     }
 
     private double calculateMAD(double[] dd, double median) {
@@ -1254,9 +1296,17 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
     return result;
 }
 
-    private boolean isTumorRead(SAMRecord read) {
+    public enum ReadSource { Tumor, Normal, Control }
+    
+    private ReadSource getReadSource(SAMRecord read) {
+        // check if it's a tumor
         SAMReaderID id = getToolkit().getReaderIDForRead(read);
-        return tumorSAMReaderIDs.contains(id);
+        if (tumorSAMReaderIDs.contains(id)) { return ReadSource.Tumor; }
+        if (normalSAMReaderIDs.contains(id)) { return ReadSource.Normal; }
+        if (controlSAMReaderIDs.contains(id)) { return ReadSource.Control; }
+        
+        // unexpected condition
+        throw new RuntimeException("Unable to determine read source (tumor,normal,control) for read " + read.getReadName());               
     }
 
 }
