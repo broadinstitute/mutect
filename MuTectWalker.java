@@ -682,10 +682,12 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 }
             }
 
-            // if more than one site passes the threshold for KEEP the fail the tri_allelic Site filter
+            // if more than one site passes the tumor lod threshold for KEEP the fail the tri_allelic Site filter
             int passingCandidates = 0;
             for(CandidateMutation c : messageByTumorLod.values()) {
-                if (!c.isRejected()){ passingCandidates++; }
+                if (c.getTumorLodFStar() >= MTAC.TUMOR_LOD_THRESHOLD){
+                    passingCandidates++;
+                }
             }
 
             if (passingCandidates > 1) {
