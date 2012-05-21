@@ -71,6 +71,9 @@ public class MuTectArgumentCollection {
     @Argument(fullName = "dbsnp_normal_lod", required = false, doc = "LOD threshold for calling normal non-variant at dbsnp sites")
     public float NORMAL_DBSNP_LOD_THRESHOLD = 5.3f;
 
+    @Argument(fullName = "somatic_classification_normal_power_threshold", required = false, doc = "Power threshold for normal to determine germline vs variant")
+    public float SOMATIC_CLASSIFICATION_NORMAL_POWER_THRESHOLD = 0.95f;
+
     @Argument(fullName = "minimum_normal_allele_fraction", required = false, doc = "minimum allele fraction to be considered in normal, useful for normal sample contaminated with tumor")
     public float MINIMUM_NORMAL_ALLELE_FRACTION = 0.00f;
 

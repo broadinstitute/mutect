@@ -253,7 +253,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 	public Integer map(final RefMetaDataTracker tracker, final ReferenceContext ref, final AlignmentContext rawContext) {
         if (MTAC.NOOP) return 0;
         
-        TreeMap<Double, String> messageByTumorLod = new TreeMap<Double, String>();
+        TreeMap<Double, CandidateMutation> messageByTumorLod = new TreeMap<Double, CandidateMutation>();
 
         ReadBackedPileup pileup = rawContext.getBasePileup();
         int numberOfReads = pileup.depthOfCoverage();
@@ -673,19 +673,32 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 // test to see if the candidate should be rejected
                 performRejection(candidate);
 
-                String csOutput = callStatsGenerator.generateCallStats(candidate);
+                // FIXME: this is inefficient.  Put everything into the data structure (with Candidate as the value) and then print it outside the main loop
                 if (MTAC.FORCE_ALLELES) {
-                    out.println(csOutput);
+                    out.println(callStatsGenerator.generateCallStats(candidate));
                 } else {
 //                    System.out.println("putting in " + altAllele + " with lod " + candidate.getInitialTumorLod());
-                    messageByTumorLod.put(candidate.getInitialTumorLod(), csOutput);
+                    messageByTumorLod.put(candidate.getInitialTumorLod(), candidate);
+                }
+            }
+
+            // if more than one site passes the threshold for KEEP the fail the tri_allelic Site filter
+            int passingCandidates = 0;
+            for(CandidateMutation c : messageByTumorLod.values()) {
+                if (!c.isRejected()){ passingCandidates++; }
+            }
+
+            if (passingCandidates > 1) {
+                for(CandidateMutation c : messageByTumorLod.values()) {
+                    c.addRejectionReason("triallelic_site");
                 }
             }
 
             // write out the call stats for the "best" candidate
             if (!messageByTumorLod.isEmpty()) {
-                out.println(messageByTumorLod.lastEntry().getValue());
+                out.println(callStatsGenerator.generateCallStats(messageByTumorLod.lastEntry().getValue()));
             }
+
             return -1;
         } catch (Throwable t) {
             System.err.println("Error processing " + rawContext.getContig() + ":" + rawContext.getPosition());
@@ -938,14 +951,6 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
             return;
         }
 
-        // if the best theory for the normal is A het (not necessarily this het)
-        // just move on.  We're not attempting to call LOH with this tool
-        if (candidate.getInitialNormalBestGenotype() != DiploidGenotype.AA &&
-            candidate.getInitialNormalBestGenotype() != DiploidGenotype.CC &&
-            candidate.getInitialNormalBestGenotype() != DiploidGenotype.GG &&
-            candidate.getInitialNormalBestGenotype() != DiploidGenotype.TT) {
-            candidate.addRejectionReason("het_normal");
-        }
 
         if (candidate.getTumorInsertionCount() >= MTAC.GAP_EVENTS_THRESHOLD ||
             candidate.getTumorDeletionCount()  >= MTAC.GAP_EVENTS_THRESHOLD) {
