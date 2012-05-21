@@ -22,12 +22,16 @@ public class VariableAllelicRatioGenotypeLikelihoods extends DiploidSNPGenotypeL
     public VariableAllelicRatioGenotypeLikelihoods(char ref, double f) {
 //        super(new DiploidSNPGenotypePriors(), DiploidSNPGenotypeLikelihoods.DEFAULT_PCR_ERROR_RATE);
         // TODO: re-enable the non-zero PCR Error rate once we understand the effect of it
-        super(new DiploidSNPGenotypePriors(), 0);
+        super(0);
         this.ref = ref;
 
         this.logF = log10(1/f);
         this.logOneMinusF = log10(1/(1-f));
         this.logHalf = log10(1/.5);
+    }
+
+    public double getLikelihood(DiploidGenotype g) {
+        return getLikelihoods()[g.ordinal()];
     }
 
     protected DiploidSNPGenotypeLikelihoods calculateGenotypeLikelihoods(byte observedBase1, byte qualityScore1, byte observedBase2, byte qualityScore2) {
@@ -64,7 +68,7 @@ public class VariableAllelicRatioGenotypeLikelihoods extends DiploidSNPGenotypeL
                 double likelihood = log10(p_base);
 
                 gl.log10Likelihoods[g.ordinal()] += likelihood;
-                gl.log10Posteriors[g.ordinal()] += likelihood;
+                //gl.log10Posteriors[g.ordinal()] += likelihood;
             }
             if ( VERBOSE ) {
                 for ( DiploidGenotype g : DiploidGenotype.values() ) { System.out.printf("%s\t", g); }
@@ -97,7 +101,7 @@ public class VariableAllelicRatioGenotypeLikelihoods extends DiploidSNPGenotypeL
             double likelihood = likelihoods[g.ordinal()];
 
             log10Likelihoods[g.ordinal()] += likelihood;
-            log10Posteriors[g.ordinal()] += likelihood;
+            //log10Posteriors[g.ordinal()] += likelihood;
         }
 
         return 1;
