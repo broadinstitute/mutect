@@ -27,6 +27,10 @@ public class LocusReadPile {
     protected ReadBackedPileup qualityScoreFilteredPileup;
     public ReadBackedPileup finalPileup;
 
+
+    public ReadBackedPileup finalPileupPositiveStrand;
+    public ReadBackedPileup finalPileupNegativeStrand;
+
     public static final int GAP_EVENT_PROXIMITY = 5; // a 11bp window
     protected int deletionsCount = 0;
     protected int insertionsCount = 0;
@@ -50,6 +54,10 @@ public class LocusReadPile {
         this.initialPileup = noOverlapPileup.getPileupWithoutDeletions();
         this.qualityScoreFilteredPileup = initialPileup.getBaseFilteredPileup(minQualityScore);
         this.finalPileup = qualityScoreFilteredPileup.getPileupWithoutMappingQualityZeroReads();
+
+        // apply the same process to derive the strand-specific pileups but in this case don't disregard the overlaps
+        this.finalPileupPositiveStrand = pileup.getPileupWithoutDeletions().getBaseFilteredPileup(minQualityScore).getPileupWithoutMappingQualityZeroReads().getPositiveStrandPileup();
+        this.finalPileupNegativeStrand = pileup.getPileupWithoutDeletions().getBaseFilteredPileup(minQualityScore).getPileupWithoutMappingQualityZeroReads().getNegativeStrandPileup();
 
         for (PileupElement p : qualityScoreFilteredPileup) {
             if (p.getMappingQual() == 0 && !allowMapq0ForQualSum) { continue; }

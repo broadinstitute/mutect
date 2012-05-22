@@ -600,15 +600,14 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setTumorFLowerBound(tumorFLB);
 
                 //TODO: shouldn't this be f2 in the lod calculation instead of the strand specific f values?
-                ReadBackedPileup forwardPileup = t2.finalPileup.getPositiveStrandPileup();
+                // TODO: clean up use of forward/reverse vs positive/negative (prefer the latter since GATK uses it)
+                ReadBackedPileup forwardPileup = t2.finalPileupPositiveStrand;
                 double f2forward = LocusReadPile.estimateAlleleFraction(forwardPileup, upRef, altAllele);
                 candidate.setTumorLodFStarForward(t2.calculateAltVsRefLOD(forwardPileup, (byte)altAllele, f2forward, 0.0, null));
 
-                ReadBackedPileup reversePileup = t2.finalPileup.getNegativeStrandPileup();
+                ReadBackedPileup reversePileup = t2.finalPileupNegativeStrand;
                 double f2reverse = LocusReadPile.estimateAlleleFraction(reversePileup, upRef, altAllele);
                 candidate.setTumorLodFStarReverse(t2.calculateAltVsRefLOD(reversePileup, (byte)altAllele, f2reverse, 0.0, null));
-
-
 
                 // calculate strand bias power
                 candidate.setPowerToDetectPositiveStrandArtifact(
