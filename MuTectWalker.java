@@ -54,14 +54,14 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
     // Reference Metadata inputs
     /***************************************/
     @Input(fullName="dbsnp", shortName = "dbsnp", doc="VCF file of DBSNP information", required=false)
-    public RodBinding<VariantContext> dbsnpRod;
+    public List<RodBinding<VariantContext>> dbsnpRod;
 
     @Input(fullName="cosmic", shortName = "cosmic", doc="VCF file of COSMIC sites", required=false)
-    public RodBinding<VariantContext> cosmicRod;
+    public List<RodBinding<VariantContext>> cosmicRod;
 
     @Hidden
     @Input(fullName="normal_panel", shortName = "normal_panel", doc="VCF file of sites observed in normal", required=false)
-    public RodBinding<VariantContext> normalPanelRod;
+    public List<RodBinding<VariantContext>> normalPanelRod;
 
     /***************************************/
     // coverage outputs
@@ -416,7 +416,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setImproperPairs(improperPairs);
                 candidate.setMapQ0Reads(mapQ0Reads);
                 candidate.setContaminationFraction(MTAC.FRACTION_CONTAMINATION);
-                candidate.setPanelOfNormalsVC(panelOfNormalsVC.isEmpty()?null:panelOfNormalsVC.iterator().next());
+                candidate.setPanelOfNormalsVC(panelOfNormalsVC.isEmpty()?null:panelOfNormalsVC.iterator().next()); // if there are multiple, we're just grabbing the first
                 candidate.setCosmicSite(!cosmicVC.isEmpty());
                 candidate.setDbsnpSite(!dbsnpVC.isEmpty());
                 candidate.setTumorF(tumorReadPile.estimateAlleleFraction(upRef, altAllele));
