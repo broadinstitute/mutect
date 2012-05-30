@@ -566,7 +566,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
                 candidate.setPriorBaseNegativeDirection(priorBaseNegativeDirection);
 
                 // TODO: make this parameterizable
-                final LocusReadPile t2 = filterReads(ref, tumorReadPile, true, !NO_BAQ);
+                final LocusReadPile t2 = filterReads(ref, tumorReadPile.finalPileup, true, !NO_BAQ);
 
                 // if there are no reads remaining, abandon this theory
                 if ( !MTAC.FORCE_OUTPUT && t2.finalPileupReads.size() == 0) { continue; }
@@ -601,11 +601,11 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
                 //TODO: shouldn't this be f2 in the lod calculation instead of the strand specific f values?
                 // TODO: clean up use of forward/reverse vs positive/negative (prefer the latter since GATK uses it)
-                ReadBackedPileup forwardPileup = t2.finalPileupPositiveStrand;
+                ReadBackedPileup forwardPileup = filterReads(ref, tumorReadPile.finalPileupPositiveStrand, true, !NO_BAQ).finalPileupPositiveStrand;
                 double f2forward = LocusReadPile.estimateAlleleFraction(forwardPileup, upRef, altAllele);
                 candidate.setTumorLodFStarForward(t2.calculateAltVsRefLOD(forwardPileup, (byte)altAllele, f2forward, 0.0, null));
 
-                ReadBackedPileup reversePileup = t2.finalPileupNegativeStrand;
+                ReadBackedPileup reversePileup = filterReads(ref,tumorReadPile.finalPileupNegativeStrand, true, !NO_BAQ).finalPileupNegativeStrand;
                 double f2reverse = LocusReadPile.estimateAlleleFraction(reversePileup, upRef, altAllele);
                 candidate.setTumorLodFStarReverse(t2.calculateAltVsRefLOD(reversePileup, (byte)altAllele, f2reverse, 0.0, null));
 
@@ -1012,11 +1012,10 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 //            candidate.addRejectionReason("negative_strand_artifact");
 //        }
 
-        if (candidate.getPowerToDetectNegativeStrandArtifact() >= MTAC.STRAND_ARTIFACT_POWER_THRESHOLD && candidate.getTumorLodFStarForward() < MTAC.STRAND_ARTIFACT_LOD_THRESHOLD) {
-            candidate.addRejectionReason("strand_artifact");
-        }
-
-        if (candidate.getPowerToDetectPositiveStrandArtifact() >= MTAC.STRAND_ARTIFACT_POWER_THRESHOLD && candidate.getTumorLodFStarReverse() < MTAC.STRAND_ARTIFACT_LOD_THRESHOLD) {
+        if (
+                (candidate.getPowerToDetectNegativeStrandArtifact() >= MTAC.STRAND_ARTIFACT_POWER_THRESHOLD && candidate.getTumorLodFStarForward() < MTAC.STRAND_ARTIFACT_LOD_THRESHOLD) ||
+                (candidate.getPowerToDetectPositiveStrandArtifact() >= MTAC.STRAND_ARTIFACT_POWER_THRESHOLD && candidate.getTumorLodFStarReverse() < MTAC.STRAND_ARTIFACT_LOD_THRESHOLD)
+                ) {
             candidate.addRejectionReason("strand_artifact");
         }
 
@@ -1129,10 +1128,10 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
     // TODO: or should we be using this? baqHMM = new BAQ(1e-3, 0.1, bw, (byte)0, true); from the BAQ unit test?
     IndexedFastaSequenceFile refReader;
 
-    private LocusReadPile filterReads(final ReferenceContext ref, final LocusReadPile pile, boolean filterMateRescueReads, boolean applyBAQ) {
+    private LocusReadPile filterReads(final ReferenceContext ref, final ReadBackedPileup pile, boolean filterMateRescueReads, boolean applyBAQ) {
         ArrayList<PileupElement> newPileupElements = new ArrayList<PileupElement>();
 
-        for ( PileupElement p : pile.finalPileup ) {
+        for ( PileupElement p : pile ) {
             final GATKSAMRecord read = p.getRead();
 
             int mismatchQualitySum =
@@ -1165,10 +1164,10 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
 
         }
         ReadBackedPileup newPileup =
-                new ReadBackedPileupImpl(pile.pileup.getLocation(), newPileupElements);
+                new ReadBackedPileupImpl(ref.getLocus(), newPileupElements);
 
 
-        final LocusReadPile newPile = new LocusReadPile(newPileup, pile.refBase, 0, 0);
+        final LocusReadPile newPile = new LocusReadPile(newPileup, (char)ref.getBase(), 0, 0);
 
         return newPile;
     }
