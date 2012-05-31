@@ -54,14 +54,14 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
     // Reference Metadata inputs
     /***************************************/
     @Input(fullName="dbsnp", shortName = "dbsnp", doc="VCF file of DBSNP information", required=false)
-    public List<RodBinding<VariantContext>> dbsnpRod;
+    public List<RodBinding<VariantContext>> dbsnpRod = Collections.emptyList();;
 
     @Input(fullName="cosmic", shortName = "cosmic", doc="VCF file of COSMIC sites", required=false)
-    public List<RodBinding<VariantContext>> cosmicRod;
+    public List<RodBinding<VariantContext>> cosmicRod = Collections.emptyList();;
 
     @Hidden
     @Input(fullName="normal_panel", shortName = "normal_panel", doc="VCF file of sites observed in normal", required=false)
-    public List<RodBinding<VariantContext>> normalPanelRod;
+    public List<RodBinding<VariantContext>> normalPanelRod = Collections.emptyList();;
 
     /***************************************/
     // coverage outputs
