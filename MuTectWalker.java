@@ -252,7 +252,7 @@ public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeR
     @Override
 	public Integer map(final RefMetaDataTracker tracker, final ReferenceContext ref, final AlignmentContext rawContext) {
         if (MTAC.NOOP) return 0;
-        
+
         TreeMap<Double, CandidateMutation> messageByTumorLod = new TreeMap<Double, CandidateMutation>();
 
         ReadBackedPileup pileup = rawContext.getBasePileup();
