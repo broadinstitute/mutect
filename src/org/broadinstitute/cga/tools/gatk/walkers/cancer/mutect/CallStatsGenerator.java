@@ -206,13 +206,16 @@ public class CallStatsGenerator {
             };
 
         if (this.enableExtendedOutput) {
+            for(int i=0; i<msg.length; i++) {
+                if (msg[i]==null) { System.out.println("ERROR: found null in output at position " + i); }
+            }
             return StringUtil.join(TAB, msg);
         } else {
             List<String> output = new ArrayList<String>();
             for(int index : minimalHeaderIndicies) {
                 output.add(msg[index]);
             }
-            return StringUtil.join(TAB, output.toArray(new String[]{}));
+            return StringUtil.join(TAB, output);
         }
     }
 
