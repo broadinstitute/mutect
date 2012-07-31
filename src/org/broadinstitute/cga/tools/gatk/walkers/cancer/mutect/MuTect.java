@@ -17,7 +17,6 @@ import org.broadinstitute.sting.gatk.contexts.ReferenceContext;
 import org.broadinstitute.sting.gatk.datasources.reads.SAMReaderID;
 import org.broadinstitute.sting.gatk.refdata.RefMetaDataTracker;
 import org.broadinstitute.sting.gatk.walkers.*;
-import org.broadinstitute.sting.gatk.walkers.genotyper.DiploidGenotype;
 import org.broadinstitute.sting.utils.BaseUtils;
 import org.broadinstitute.sting.utils.GenomeLoc;
 import org.broadinstitute.sting.utils.baq.BAQ;
@@ -31,9 +30,9 @@ import org.broadinstitute.sting.utils.variantcontext.VariantContext;
 
 @PartitionBy(PartitionType.LOCUS)
 @BAQMode()
-@Reference(window=@Window(start=-1* MuTectWalker.REFERENCE_HALF_WINDOW_LENGTH,stop= MuTectWalker.REFERENCE_HALF_WINDOW_LENGTH))
+@Reference(window=@Window(start=-1* MuTect.REFERENCE_HALF_WINDOW_LENGTH,stop= MuTect.REFERENCE_HALF_WINDOW_LENGTH))
 @By(DataSource.REFERENCE)
-public class MuTectWalker extends LocusWalker<Integer, Integer> implements TreeReducible<Integer> {
+public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducible<Integer> {
     public static final int REFERENCE_HALF_WINDOW_LENGTH = 150;
     public static final String BAM_TAG_TUMOR = "tumor";
     public static final String BAM_TAG_NORMAL = "normal";

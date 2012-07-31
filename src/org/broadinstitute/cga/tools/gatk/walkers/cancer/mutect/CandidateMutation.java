@@ -30,8 +30,8 @@ public class CandidateMutation {
 
     private boolean positiveDirectionPowered;
     private boolean negativeDirectionPowered;
-    private String tumorSampleName;
-    private String normalSampleName;
+    private String tumorSampleName = "TUMOR";
+    private String normalSampleName = "NORMAL";
 
     private double contaminationFraction;
 
@@ -95,10 +95,10 @@ public class CandidateMutation {
     private double powerToDetectPositiveStrandArtifact;
     private double powerToDetectNegativeStrandArtifact;
 
-    private MuTectWalker.FisherData strandBias;
-    private MuTectWalker.FisherData perfectStrandBias;
+    private MuTect.FisherData strandBias;
+    private MuTect.FisherData perfectStrandBias;
 
-    private MuTectWalker.FisherData clippingBias;
+    private MuTect.FisherData clippingBias;
 
     private List<Integer> tumorAltForwardOffsetsInRead;
     private List<Integer> tumorAltReverseOffsetsInRead;
@@ -391,27 +391,27 @@ public class CandidateMutation {
         this.tumorReadPositionRankSumTest = tumorReadPositionRankSumTest;
     }
 
-    public MuTectWalker.FisherData getStrandBias() {
+    public MuTect.FisherData getStrandBias() {
         return strandBias;
     }
 
-    public void setStrandBias(MuTectWalker.FisherData strandBias) {
+    public void setStrandBias(MuTect.FisherData strandBias) {
         this.strandBias = strandBias;
     }
 
-    public MuTectWalker.FisherData getPerfectStrandBias() {
+    public MuTect.FisherData getPerfectStrandBias() {
         return perfectStrandBias;
     }
 
-    public void setPerfectStrandBias(MuTectWalker.FisherData perfectStrandBias) {
+    public void setPerfectStrandBias(MuTect.FisherData perfectStrandBias) {
         this.perfectStrandBias = perfectStrandBias;
     }
 
-    public MuTectWalker.FisherData getClippingBias() {
+    public MuTect.FisherData getClippingBias() {
         return clippingBias;
     }
 
-    public void setClippingBias(MuTectWalker.FisherData clippingBias) {
+    public void setClippingBias(MuTect.FisherData clippingBias) {
         this.clippingBias = clippingBias;
     }
 
