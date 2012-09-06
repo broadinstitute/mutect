@@ -6,6 +6,7 @@ import java.util.*;
 import net.sf.picard.reference.IndexedFastaSequenceFile;
 import net.sf.samtools.*;
 
+import org.apache.commons.lang.math.NumberUtils;
 import org.apache.commons.math.MathException;
 import org.apache.commons.math.distribution.BetaDistribution;
 import org.apache.commons.math.distribution.BetaDistributionImpl;
@@ -644,6 +645,12 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 final LocusReadPile mutantPile = new LocusReadPile(mutantPileup, altAllele, 0, 0);
                 final LocusReadPile refPile =  new LocusReadPile(referencePileup, altAllele, 0, 0);
 
+                // Set the maximum observed mapping quality score for the reference and alternate alleles
+                byte[] rmq = referencePileup.getMappingQuals();
+                candidate.setTumorRefMaxMapQ((rmq.length==0)?0:NumberUtils.max(rmq));
+
+                byte[] amq = mutantPileup.getMappingQuals();
+                candidate.setTumorAltMaxMapQ((amq.length==0)?0:NumberUtils.max(amq));
 
                 candidate.setPerfectStrandBias(calculatePerfectStrandBias(mutantPile));
                 candidate.setStrandBias(calculateStrandBias(refPile, mutantPile));
@@ -1020,6 +1027,10 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
 
         if (candidate.getTotalPairs() > 0 && ((float)candidate.getMapQ0Reads() / (float)candidate.getTotalPairs()) >= MTAC.FRACTION_MAPQ0_THRESHOLD) {
             candidate.addRejectionReason("poor_mapping_region_mapq0");
+        }
+        
+        if (candidate.getTumorAltMaxMapQ() < MTAC.REQUIRED_MAXIMUM_ALT_ALLELE_MAPPING_QUALITY_SCORE) {
+            candidate.addRejectionReason("poor_mapping_region_alternate_allele_mapq");
         }
 
         if (candidate.isSeenInPanelOfNormals()) {

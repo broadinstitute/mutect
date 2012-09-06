@@ -21,7 +21,7 @@ public class CallStatsGenerator {
                 "contig","position","context","ref_allele","alt_allele","tumor_name","normal_name","score","dbsnp_site",
                 "covered", "power", "tumor_power", "normal_power", "normal_power_nsp", "normal_power_wsp",
                 "total_pairs","improper_pairs","map_Q0_reads",
-                "init_t_lod","t_lod_fstar","t_lod_lqs", "t_lod_fstar_forward", "t_lod_fstar_reverse", "tumor_f", "tumor_f_lb", "contaminant_fraction","contaminant_lod","minimum_tumor_f", "t_q20_count", "t_ref_count","t_alt_count","t_ref_sum","t_alt_sum","t_ins_count","t_del_count",
+                "init_t_lod","t_lod_fstar","t_lod_lqs", "t_lod_fstar_forward", "t_lod_fstar_reverse", "tumor_f", "tumor_f_lb", "contaminant_fraction","contaminant_lod","minimum_tumor_f", "t_q20_count", "t_ref_count","t_alt_count","t_ref_sum","t_alt_sum","t_ref_max_mapq","t_alt_max_mapq","t_ins_count","t_del_count",
                 "normal_best_gt","init_n_lod","n_lod_fstar","normal_f", "normal_f_quals",
                 "normal_artifact_lod_tf", "normal_artifact_lod_low_tf", "normal_artifact_lod_nf", "normal_artifact_lod_nfq",
                 "n_q20_count", "n_ref_count","n_alt_count","n_ref_sum","n_alt_sum",
@@ -42,7 +42,7 @@ public class CallStatsGenerator {
                 "covered", "power", "tumor_power", "normal_power",
                 "total_pairs","improper_pairs","map_Q0_reads",
                 "t_lod_fstar","tumor_f","contaminant_fraction","contaminant_lod",
-                "t_ref_count","t_alt_count","t_ref_sum","t_alt_sum","t_ins_count","t_del_count",
+                "t_ref_count","t_alt_count","t_ref_sum","t_alt_sum","t_ref_max_mapq","t_alt_max_mapq","t_ins_count","t_del_count",
                 "normal_best_gt","init_n_lod", "n_ref_count","n_alt_count","n_ref_sum","n_alt_sum",
                 "judgement"
             };
@@ -154,6 +154,8 @@ public class CallStatsGenerator {
                         format(candidate.getInitialTumorAltCounts()),
                         format(candidate.getInitialTumorRefQualitySum()),
                         format(candidate.getInitialTumorAltQualitySum()),
+                        format(candidate.getTumorRefMaxMapQ()),
+                        format(candidate.getTumorAltMaxMapQ()),
                         format(candidate.getTumorInsertionCount()),
                         format(candidate.getTumorDeletionCount()),
                         format(candidate.getInitialNormalBestGenotype().toString()),

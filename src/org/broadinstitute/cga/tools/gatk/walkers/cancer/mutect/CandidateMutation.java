@@ -54,6 +54,8 @@ public class CandidateMutation {
     private int initialNormalAltCounts;
     private int initialNormalRefQualitySum;
     private int initialNormalAltQualitySum;
+    private int tumorRefMaxMapQ;
+    private int tumorAltMaxMapQ;
     private int initialNormalReadDepth;
     private DiploidGenotype initialNormalBestGenotype;
 
@@ -799,6 +801,22 @@ public class CandidateMutation {
 
     public void setNormalArtifactLodNFQ(double normalArtifactLodNFQ) {
         this.normalArtifactLodNFQ = normalArtifactLodNFQ;
+    }
+
+    public int getTumorAltMaxMapQ() {
+        return tumorAltMaxMapQ;
+    }
+
+    public void setTumorAltMaxMapQ(int tumorAltMaxMapQ) {
+        this.tumorAltMaxMapQ = tumorAltMaxMapQ;
+    }
+
+    public int getTumorRefMaxMapQ() {
+        return tumorRefMaxMapQ;
+    }
+
+    public void setTumorRefMaxMapQ(int tumorRefMaxMapQ) {
+        this.tumorRefMaxMapQ = tumorRefMaxMapQ;
     }
 }
 

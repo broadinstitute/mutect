@@ -101,6 +101,9 @@ public class MuTectArgumentCollection {
     @Argument(fullName = "pir_mad_threshold", required = false, doc="threshold for clustered read position artifact MAD")
     public double PIR_MAD_THRESHOLD = 3;
 
+    @Argument(fullName = "required_maximum_alt_allele_mapping_quality_score", required = false, doc="required minimum value for tumor alt allele maximum mapping quality score")
+    public int REQUIRED_MAXIMUM_ALT_ALLELE_MAPPING_QUALITY_SCORE = 20;
+
     /** Parameters for ALT ALLELE IN NORMAL filter **/
     @Argument(fullName = "max_alt_alleles_in_normal_count", required = false, doc="threshold for maximum alternate allele counts in normal")
     public int MAX_ALT_ALLELES_IN_NORMAL_COUNT = 2;
