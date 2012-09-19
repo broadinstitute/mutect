@@ -25,11 +25,6 @@ public class CandidateMutation {
     private double normalPowerNoSNPPrior;
 
     private char altAllele = 'N';
-    private char priorBasePositiveDirection;
-    private char priorBaseNegativeDirection;
-
-    private boolean positiveDirectionPowered;
-    private boolean negativeDirectionPowered;
     private String tumorSampleName = "TUMOR";
     private String normalSampleName = "NORMAL";
 
@@ -91,14 +86,12 @@ public class CandidateMutation {
 
     private RankSumTest.Result tumorQualityRankSumTest;
     private RankSumTest.Result tumorReadPositionRankSumTest;
-    private Map<Integer, Double> classicSkewScoresAndOffsets;
-    private Map<Integer, Double> fisherSkewScoresAndOffsets;
 
     private double powerToDetectPositiveStrandArtifact;
     private double powerToDetectNegativeStrandArtifact;
 
-    private FisherExact.FisherData strandBias;
-    private FisherExact.FisherData perfectStrandBias;
+    private int[] strandContingencyTable;
+
     private FisherExact.FisherData clippingBias;
 
     private List<Integer> tumorAltForwardOffsetsInRead;
@@ -126,14 +119,6 @@ public class CandidateMutation {
         return score;
     }
 
-    public boolean isPositiveDirectionAtRisk() {
-        return getPriorBasePositiveDirection() == getAltAllele();
-    }
-
-    public boolean isNegativeDirectionAtRisk() {
-        return getPriorBaseNegativeDirection() == getAltAllele();
-    }
-
     public boolean isGermlineAtRisk() {
         return (dbsnpSite && !cosmicSite);
     }
@@ -142,21 +127,12 @@ public class CandidateMutation {
     // GENERATED CODE BELOW THIS POINT
     // -------------------------------------------------------------------------
 
-
-    public boolean isPositiveDirectionPowered() {
-        return positiveDirectionPowered;
+    public int[] getStrandContingencyTable() {
+        return strandContingencyTable;
     }
 
-    public void setPositiveDirectionPowered(boolean positiveDirectionPowered) {
-        this.positiveDirectionPowered = positiveDirectionPowered;
-    }
-
-    public boolean isNegativeDirectionPowered() {
-        return negativeDirectionPowered;
-    }
-
-    public void setNegativeDirectionPowered(boolean negativeDirectionPowered) {
-        this.negativeDirectionPowered = negativeDirectionPowered;
+    public void setStrandContingencyTable(int[] strandContingencyTable) {
+        this.strandContingencyTable = strandContingencyTable;
     }
 
     public GenomeLoc getLocation() {
@@ -197,22 +173,6 @@ public class CandidateMutation {
 
     public void setAltAllele(char altAllele) {
         this.altAllele = altAllele;
-    }
-
-    public char getPriorBasePositiveDirection() {
-        return priorBasePositiveDirection;
-    }
-
-    public void setPriorBasePositiveDirection(char priorBasePositiveDirection) {
-        this.priorBasePositiveDirection = priorBasePositiveDirection;
-    }
-
-    public char getPriorBaseNegativeDirection() {
-        return priorBaseNegativeDirection;
-    }
-
-    public void setPriorBaseNegativeDirection(char priorBaseNegativeDirection) {
-        this.priorBaseNegativeDirection = priorBaseNegativeDirection;
     }
 
     public boolean isRejected() {
@@ -392,22 +352,6 @@ public class CandidateMutation {
         this.tumorReadPositionRankSumTest = tumorReadPositionRankSumTest;
     }
 
-    public FisherExact.FisherData getStrandBias() {
-        return strandBias;
-    }
-
-    public void setStrandBias(FisherExact.FisherData strandBias) {
-        this.strandBias = strandBias;
-    }
-
-    public FisherExact.FisherData getPerfectStrandBias() {
-        return perfectStrandBias;
-    }
-
-    public void setPerfectStrandBias(FisherExact.FisherData perfectStrandBias) {
-        this.perfectStrandBias = perfectStrandBias;
-    }
-
     public FisherExact.FisherData getClippingBias() {
         return clippingBias;
     }
@@ -491,22 +435,6 @@ public class CandidateMutation {
 
     public void setNormalQ20Count(int normalQ20Count) {
         this.normalQ20Count = normalQ20Count;
-    }
-
-    public Map<Integer, Double> getClassicSkewScoresAndOffsets() {
-        return classicSkewScoresAndOffsets;
-    }
-
-    public void setClassicSkewScoresAndOffsets(Map<Integer, Double> classicSkewScoresAndOffsets) {
-        this.classicSkewScoresAndOffsets = classicSkewScoresAndOffsets;
-    }
-
-    public Map<Integer, Double> getFisherSkewScoresAndOffsets() {
-        return fisherSkewScoresAndOffsets;
-    }
-
-    public void setFisherSkewScoresAndOffsets(Map<Integer, Double> fisherSkewScoresAndOffsets) {
-        this.fisherSkewScoresAndOffsets = fisherSkewScoresAndOffsets;
     }
 
     public int getTumorInsertionCount() {

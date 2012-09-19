@@ -541,21 +541,6 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 final long refStart = Math.max(1, rawContext.getLocation().getStart() - 150);
                 String refGATKString = new String(ref.getBases());
 
-                // handle the case where there are no bases before or after!
-                char priorBasePositiveDirection = 'N';
-                char priorBaseNegativeDirection = 'N';
-
-
-                if (containsPosition(ref.getWindow(), candidate.getLocation().getStart() - 1)) {
-                    priorBasePositiveDirection = (char) ref.getBases()[(int)candidate.getLocation().getStart() - MTAC.SEQ_ERROR_MODEL.getPriorBaseOffset() - (int)ref.getWindow().getStart()];
-                }
-
-                if (containsPosition(ref.getWindow(), candidate.getLocation().getStart() + 1)) {
-                    priorBaseNegativeDirection = (char) ref.getBases()[(int)candidate.getLocation().getStart() + MTAC.SEQ_ERROR_MODEL.getPriorBaseOffset() - (int)ref.getWindow().getStart()];
-                }
-
-                candidate.setPriorBasePositiveDirection(priorBasePositiveDirection);
-                candidate.setPriorBaseNegativeDirection(priorBaseNegativeDirection);
 
                 // TODO: make this parameterizable
                 final LocusReadPile t2 = filterReads(ref, tumorReadPile.finalPileup, true);
@@ -644,8 +629,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 byte[] amq = mutantPileup.getMappingQuals();
                 candidate.setTumorAltMaxMapQ((amq.length==0)?0:NumberUtils.max(amq));
 
-                candidate.setPerfectStrandBias(calculatePerfectStrandBias(mutantPile));
-                candidate.setStrandBias(calculateStrandBias(refPile, mutantPile));
+                candidate.setStrandContingencyTable(getStrandContingencyTable(refPile, mutantPile));
 
                 // start with just the tumor pile
                 candidate.setTumorAltForwardOffsetsInRead(getForwardOffsetsInRead(mutantPileup));
@@ -771,20 +755,14 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         return ((float) clipped / (float)total >= MTAC.HEAVILY_CLIPPED_READ_FRACTION);
     }
 
-    private FisherExact.FisherData calculateStrandBias(LocusReadPile refPile, LocusReadPile mutantPile) {
+    private int[] getStrandContingencyTable(LocusReadPile refPile, LocusReadPile mutantPile) {
         // Construct a 2x2 contingency table of
         //            pos     neg
         //      REF    a       b
         //      MUT    c       d
         //
-        // and return an array of {a,b,c,d,two-tailed-p}
+        // and return an array of {a,b,c,d}
 
-        //
-        // POWER: to meet P <= 0.05 with just 1 mut allele we need 19 ref reads (f=0.05)
-        // to meet P <= 0.05 with 2 mut alleles, we need 5 ref reads
-        // to meet P <= 0.05 with 3 mut alleles, we need 3 ref reads 
-
-        
         int a = 0, b = 0, c = 0, d = 0;
         for (SAMRecord rec : refPile.finalPileupReads) {
             if (rec.getReadNegativeStrandFlag()) { b++;} else { a++; }
@@ -793,33 +771,10 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
             if (rec.getReadNegativeStrandFlag()) { d++;} else { c++; }
         }
 
-        final double p = fisher.getTwoTailedP(a,b,c,d);
-        int n = c+d;
-        final double pmaxpos = fisher.getTwoTailedP(a,b,n,0);
-        final double pmaxneg = fisher.getTwoTailedP(a,b,0,n);
-
-        return new FisherExact.FisherData(a,b,c,d,p, pmaxpos, pmaxneg);
+        int[] results = new int[]{a,b,c,d};
+        return results;
     }
-
-
-    private FisherExact.FisherData calculatePerfectStrandBias(LocusReadPile mutantPile) {
-        try {
-            int c = 0, d = 0;
-            for (SAMRecord rec : mutantPile.finalPileupReads) {
-                if (rec.getReadNegativeStrandFlag()) { d++;} else { c++; }
-            }
-
-            int trials = c + d;
-            BinomialDistribution bd = new BinomialDistributionImpl(trials, 0.5d);
-
-            double pmax = bd.cumulativeProbability(0);
-            double p = bd.cumulativeProbability(Math.min(c,d));
-
-            return new FisherExact.FisherData(0,0,c,d,p,pmax, pmax);
-        } catch (MathException me) {
-            throw new RuntimeException("Error in ApacheMath"+me.getMessage(), me);
-        }
-    }
+    
 
     private List<Integer> getForwardOffsetsInRead(ReadBackedPileup p) {
         return getOffsetsInRead(p, true);
@@ -886,21 +841,6 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
               candidate.getTumorReverseOffsetsInReadMedian() != null && candidate.getTumorReverseOffsetsInReadMedian() <= MTAC.PIR_MEDIAN_THRESHOLD && candidate.getTumorReverseOffsetsInReadMad() != null && candidate.getTumorReverseOffsetsInReadMad() <= MTAC.PIR_MAD_THRESHOLD ) {
             candidate.addRejectionReason("clustered_read_position");
 
-        }
-
-        // TODO: clean up strand outputs to only the ones we use...
-        candidate.setPositiveDirectionPowered(
-                candidate.getPerfectStrandBias().getMaxPosP() < PERFECT_STRAND_BIAS_THRESHOLD &&
-                candidate.getStrandBias().getMaxPosP() < STRAND_BIAS_THRESHOLD);
-
-        candidate.setNegativeDirectionPowered(
-                candidate.getPerfectStrandBias().getMaxNegP() < PERFECT_STRAND_BIAS_THRESHOLD &&
-                candidate.getStrandBias().getMaxNegP() < STRAND_BIAS_THRESHOLD);
-
-
-        if (candidate.getPerfectStrandBias().getP() == Double.NaN ||
-            candidate.getStrandBias().getP() == Double.NaN) {
-            candidate.addRejectionReason("ERROR: Unable to calculate Strand Bias Score");
         }
 
         // TODO: sync naming (is it positive or forward)?

@@ -25,8 +25,8 @@ public class CallStatsGenerator {
                 "normal_best_gt","init_n_lod","n_lod_fstar","normal_f", "normal_f_quals",
                 "normal_artifact_lod_tf", "normal_artifact_lod_low_tf", "normal_artifact_lod_nf", "normal_artifact_lod_nfq",
                 "n_q20_count", "n_ref_count","n_alt_count","n_ref_sum","n_alt_sum",
-                "at_risk_positive_direction_artifact", "at_risk_negative_direction_artifact", "powered_positive_direction_artifact", "power_to_detect_positive_strand_artifact", "powered_negative_direction_artifact", "power_to_detect_negative_strand_artifact",
-                "perfect_strand_bias","strand_bias_counts","strand_bias",
+                "power_to_detect_positive_strand_artifact", "power_to_detect_negative_strand_artifact",
+                "strand_bias_counts",
                 "classic_max_skew_lod", "classic_max_skew_lod_offset", "fisher_min_skew_pvalue", "fisher_min_skew_pvalue_offset",
                 "tumor_qsrst_ms", "tumor_qsrst_pval", "tumor_rprst_ms", "tumor_rprst_pval",
                 "tumor_alt_fpir_median", "tumor_alt_fpir_mad","tumor_alt_rpir_median","tumor_alt_rpir_mad","alt_fpir","alt_rpir",
@@ -77,12 +77,15 @@ public class CallStatsGenerator {
     }
 
     public String generateCallStats(CandidateMutation candidate) {
+
+        // TODO: remove RST and Skew code
         RankSumTest.Result qrst = candidate.getTumorQualityRankSumTest();
         RankSumTest.Result prst = candidate.getTumorReadPositionRankSumTest();
 
+
         Double classicSkewScore = null;
         Integer classicSkewOffset = null;
-        Map<Integer, Double> classicSkewInfo = candidate.getClassicSkewScoresAndOffsets();
+        Map<Integer, Double> classicSkewInfo = null;
         if (classicSkewInfo != null && classicSkewInfo.size() > 0) {
             classicSkewOffset = getKeyForLargestValue(classicSkewInfo);
             classicSkewScore = classicSkewInfo.get(classicSkewOffset);
@@ -96,7 +99,7 @@ public class CallStatsGenerator {
 
         Double fisherSkewScore = null;
         Integer fisherSkewOffset = null;
-        Map<Integer, Double> fisherSkewInfo = candidate.getFisherSkewScoresAndOffsets();
+        Map<Integer, Double> fisherSkewInfo = null;
         if (fisherSkewInfo != null && fisherSkewInfo.size() > 0) {
             fisherSkewOffset = getKeyForSmallestValue(fisherSkewInfo);
             fisherSkewScore = fisherSkewInfo.get(fisherSkewOffset);
@@ -119,6 +122,14 @@ public class CallStatsGenerator {
             siteInfo = "DBSNP+COSMIC";
         }
 
+         StringBuilder sb = new StringBuilder();
+        int[] ci = candidate.getStrandContingencyTable();
+        sb.append("(");
+        sb.append(ci[0]).append(",");
+        sb.append(ci[1]).append(",");
+        sb.append(ci[2]).append(",");
+        sb.append(ci[3]).append(")");
+        String strandInfo = sb.toString();
 
         String[] msg = new String[] {
                         candidate.getLocation().getContig(),
@@ -172,15 +183,9 @@ public class CallStatsGenerator {
                         format(candidate.getInitialNormalAltCounts()),
                         format(candidate.getInitialNormalRefQualitySum()),
                         format(candidate.getInitialNormalAltQualitySum()),
-                        format(candidate.isPositiveDirectionAtRisk()?1:0),
-                        format(candidate.isNegativeDirectionAtRisk()?1:0),
-                        format(candidate.isPositiveDirectionPowered()?1:0),
                         format(candidate.getPowerToDetectPositiveStrandArtifact()),
-                        format(candidate.isNegativeDirectionPowered()?1:0),
                         format(candidate.getPowerToDetectNegativeStrandArtifact()),
-                        format(candidate.getPerfectStrandBias().getP()),
-                        format(candidate.getStrandBias().dataToString()),
-                        format(candidate.getStrandBias().getP()),
+                        format(strandInfo),
                         format(classicSkewScore),
                         format(classicSkewOffset),
                         format(fisherSkewScore),

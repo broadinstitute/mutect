@@ -137,8 +137,4 @@ public class MuTectArgumentCollection {
         }
     }
 
-    @Hidden
-    @Argument(fullName="sequencing_error_model", shortName="fP", required=false, doc="If provided, the error model will be forced to be the provided String. Valid options are illumina and solid (illumina works well as a generic model")
-    public SequencingErrorModel SEQ_ERROR_MODEL = SequencingErrorModel.illumina;
-
 }
