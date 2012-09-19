@@ -537,11 +537,6 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 candidate.setInitialNormalRefCounts(normQs.getCounts(upRef));
                 candidate.setInitialNormalReadDepth(normalReadPile.finalPileupReads.size());
 
-                // TODO: don't hardcode.  Make this the max read length in the pile
-                final long refStart = Math.max(1, rawContext.getLocation().getStart() - 150);
-                String refGATKString = new String(ref.getBases());
-
-
                 // TODO: make this parameterizable
                 final LocusReadPile t2 = filterReads(ref, tumorReadPile.finalPileup, true);
 
@@ -734,12 +729,6 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         return qual;
     }
 
-    private boolean containsPosition(GenomeLoc window, int position) {
-        return (window.getStart() <= position && position <= window.getStop());
-    }
-
-
-
 
     // TODO: we can do this more cheaply with a GATKSAMRecord...
     private boolean isReadHeavilySoftClipped(SAMRecord rec) {
@@ -801,9 +790,6 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
 
         return positions;
     }
-
-    private static final double PERFECT_STRAND_BIAS_THRESHOLD = .05d;
-    private static final double STRAND_BIAS_THRESHOLD = .05d;
 
     private void performRejection(CandidateMutation candidate) {
         if (candidate.getTumorLodFStar() < MTAC.TUMOR_LOD_THRESHOLD) {

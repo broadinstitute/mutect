@@ -21,14 +21,12 @@ public class CallStatsGenerator {
                 "contig","position","context","ref_allele","alt_allele","tumor_name","normal_name","score","dbsnp_site",
                 "covered", "power", "tumor_power", "normal_power", "normal_power_nsp", "normal_power_wsp",
                 "total_pairs","improper_pairs","map_Q0_reads",
-                "init_t_lod","t_lod_fstar","t_lod_lqs", "t_lod_fstar_forward", "t_lod_fstar_reverse", "tumor_f", "tumor_f_lb", "contaminant_fraction","contaminant_lod","minimum_tumor_f", "t_q20_count", "t_ref_count","t_alt_count","t_ref_sum","t_alt_sum","t_ref_max_mapq","t_alt_max_mapq","t_ins_count","t_del_count",
+                "init_t_lod","t_lod_fstar","t_lod_lqs", "t_lod_fstar_forward", "t_lod_fstar_reverse", "tumor_f", "tumor_f_lb", "contaminant_fraction","contaminant_lod","t_q20_count", "t_ref_count","t_alt_count","t_ref_sum","t_alt_sum","t_ref_max_mapq","t_alt_max_mapq","t_ins_count","t_del_count",
                 "normal_best_gt","init_n_lod","n_lod_fstar","normal_f", "normal_f_quals",
                 "normal_artifact_lod_tf", "normal_artifact_lod_low_tf", "normal_artifact_lod_nf", "normal_artifact_lod_nfq",
                 "n_q20_count", "n_ref_count","n_alt_count","n_ref_sum","n_alt_sum",
                 "power_to_detect_positive_strand_artifact", "power_to_detect_negative_strand_artifact",
                 "strand_bias_counts",
-                "classic_max_skew_lod", "classic_max_skew_lod_offset", "fisher_min_skew_pvalue", "fisher_min_skew_pvalue_offset",
-                "tumor_qsrst_ms", "tumor_qsrst_pval", "tumor_rprst_ms", "tumor_rprst_pval",
                 "tumor_alt_fpir_median", "tumor_alt_fpir_mad","tumor_alt_rpir_median","tumor_alt_rpir_mad","alt_fpir","alt_rpir",
                 "powered_filters",
                 "normal_artifact_power_tf", "normal_artifact_power_low_tf", "normal_artifact_power_nf",
@@ -77,35 +75,6 @@ public class CallStatsGenerator {
     }
 
     public String generateCallStats(CandidateMutation candidate) {
-
-        // TODO: remove RST and Skew code
-        RankSumTest.Result qrst = candidate.getTumorQualityRankSumTest();
-        RankSumTest.Result prst = candidate.getTumorReadPositionRankSumTest();
-
-
-        Double classicSkewScore = null;
-        Integer classicSkewOffset = null;
-        Map<Integer, Double> classicSkewInfo = null;
-        if (classicSkewInfo != null && classicSkewInfo.size() > 0) {
-            classicSkewOffset = getKeyForLargestValue(classicSkewInfo);
-            classicSkewScore = classicSkewInfo.get(classicSkewOffset);
-            if (classicSkewScore == Double.POSITIVE_INFINITY) {
-                classicSkewScore = 999999d;
-            } else if (classicSkewScore == Double.NEGATIVE_INFINITY) {
-                classicSkewScore = -999999d;
-            }
-
-        }
-
-        Double fisherSkewScore = null;
-        Integer fisherSkewOffset = null;
-        Map<Integer, Double> fisherSkewInfo = null;
-        if (fisherSkewInfo != null && fisherSkewInfo.size() > 0) {
-            fisherSkewOffset = getKeyForSmallestValue(fisherSkewInfo);
-            fisherSkewScore = fisherSkewInfo.get(fisherSkewOffset);
-        }
-
-        // further classify KEEP to indicate KEEP-CLASSIC for classic LOD
         String keepString = "REJECT";
         if (!candidate.isRejected()) {
             keepString = "KEEP";
@@ -159,7 +128,6 @@ public class CallStatsGenerator {
                         format(candidate.getTumorFLowerBound()),
                         format(candidate.getContaminationFraction()),
                         format(candidate.getContaminantLod()),
-                        format("n/a"),
                         format(candidate.getTumorQ20Count()),
                         format(candidate.getInitialTumorRefCounts()),
                         format(candidate.getInitialTumorAltCounts()),
@@ -186,14 +154,6 @@ public class CallStatsGenerator {
                         format(candidate.getPowerToDetectPositiveStrandArtifact()),
                         format(candidate.getPowerToDetectNegativeStrandArtifact()),
                         format(strandInfo),
-                        format(classicSkewScore),
-                        format(classicSkewOffset),
-                        format(fisherSkewScore),
-                        format(fisherSkewOffset),
-                        qrst==null?"n/a":format(candidate.getTumorQualityRankSumTest().getMedianShift()),
-                        qrst==null?"n/a":format(candidate.getTumorQualityRankSumTest().getP()),
-                        prst==null?"n/a":format(candidate.getTumorReadPositionRankSumTest().getMedianShift()),
-                        prst==null?"n/a":format(candidate.getTumorReadPositionRankSumTest().getP()),
                         candidate.getTumorForwardOffsetsInReadMedian()==null?"n/a":format(candidate.getTumorForwardOffsetsInReadMedian()),
                         candidate.getTumorForwardOffsetsInReadMad()==null?"n/a":format(candidate.getTumorForwardOffsetsInReadMad()),
                         candidate.getTumorReverseOffsetsInReadMedian()==null?"n/a":format(candidate.getTumorReverseOffsetsInReadMedian()),
@@ -243,32 +203,5 @@ public class CallStatsGenerator {
         }
         return out;
     }
-
-
-
-    private Integer getKeyForSmallestValue(Map<Integer, Double> map) {
-        Integer key = null;
-        Double smallest = null;
-        for (Map.Entry<Integer, Double> e : map.entrySet()) {
-            if (smallest == null || e.getValue() < smallest) {
-                key = e.getKey();
-                smallest = e.getValue();
-            }
-        }
-        return key;
-    }
-
-    private Integer getKeyForLargestValue(Map<Integer, Double> map) {
-        Integer key = null;
-        Double largest = null;
-        for (Map.Entry<Integer, Double> e : map.entrySet()) {
-            if (largest == null || e.getValue() > largest) {
-                key = e.getKey();
-                largest = e.getValue();
-            }
-        }
-        return key;
-    }
-
 
 }
