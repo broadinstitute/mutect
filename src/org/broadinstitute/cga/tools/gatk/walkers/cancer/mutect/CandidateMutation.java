@@ -97,10 +97,9 @@ public class CandidateMutation {
     private double powerToDetectPositiveStrandArtifact;
     private double powerToDetectNegativeStrandArtifact;
 
-    private MuTect.FisherData strandBias;
-    private MuTect.FisherData perfectStrandBias;
-
-    private MuTect.FisherData clippingBias;
+    private FisherExact.FisherData strandBias;
+    private FisherExact.FisherData perfectStrandBias;
+    private FisherExact.FisherData clippingBias;
 
     private List<Integer> tumorAltForwardOffsetsInRead;
     private List<Integer> tumorAltReverseOffsetsInRead;
@@ -134,7 +133,7 @@ public class CandidateMutation {
     public boolean isNegativeDirectionAtRisk() {
         return getPriorBaseNegativeDirection() == getAltAllele();
     }
-    
+
     public boolean isGermlineAtRisk() {
         return (dbsnpSite && !cosmicSite);
     }
@@ -393,27 +392,27 @@ public class CandidateMutation {
         this.tumorReadPositionRankSumTest = tumorReadPositionRankSumTest;
     }
 
-    public MuTect.FisherData getStrandBias() {
+    public FisherExact.FisherData getStrandBias() {
         return strandBias;
     }
 
-    public void setStrandBias(MuTect.FisherData strandBias) {
+    public void setStrandBias(FisherExact.FisherData strandBias) {
         this.strandBias = strandBias;
     }
 
-    public MuTect.FisherData getPerfectStrandBias() {
+    public FisherExact.FisherData getPerfectStrandBias() {
         return perfectStrandBias;
     }
 
-    public void setPerfectStrandBias(MuTect.FisherData perfectStrandBias) {
+    public void setPerfectStrandBias(FisherExact.FisherData perfectStrandBias) {
         this.perfectStrandBias = perfectStrandBias;
     }
 
-    public MuTect.FisherData getClippingBias() {
+    public FisherExact.FisherData getClippingBias() {
         return clippingBias;
     }
 
-    public void setClippingBias(MuTect.FisherData clippingBias) {
+    public void setClippingBias(FisherExact.FisherData clippingBias) {
         this.clippingBias = clippingBias;
     }
 
@@ -443,7 +442,7 @@ public class CandidateMutation {
     }
 
     public void addPoweredFilter(String filter) {
-        getPoweredFilters().add(filter);        
+        getPoweredFilters().add(filter);
     }
 
     public int getInitialTumorRefCounts() {

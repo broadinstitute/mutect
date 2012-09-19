@@ -20,7 +20,6 @@ import org.broadinstitute.sting.gatk.refdata.RefMetaDataTracker;
 import org.broadinstitute.sting.gatk.walkers.*;
 import org.broadinstitute.sting.utils.BaseUtils;
 import org.broadinstitute.sting.utils.GenomeLoc;
-import org.broadinstitute.sting.utils.baq.BAQ;
 import org.broadinstitute.sting.utils.exceptions.UserException;
 import org.broadinstitute.sting.utils.pileup.ReadBackedPileup;
 import org.broadinstitute.sting.utils.pileup.PileupElement;
@@ -81,7 +80,6 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
     @Output(fullName="normal_depth_file", shortName="ndf", doc="write out normal read depth in WIGGLE format to this file", required=false)
     public PrintStream NORMAL_DEPTH_FILE = null;
 
-    public boolean NO_BAQ = true;
     public int MIN_QSUM_QSCORE = 13;
     public boolean USE_MAPQ0_IN_NORMAL_QSCORE = true;
 
@@ -126,12 +124,6 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         }
     }
 
-
-    private static ThreadLocalRankSumTest __rankSumTest = new ThreadLocalRankSumTest();
-
-    public static RankSumTest getRankSumTest() {
-        return __rankSumTest.get();
-    }
 
     private CoverageWiggleFileWriter stdCovWriter;
     private CoverageWiggleFileWriter q20CovWriter;
@@ -566,7 +558,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 candidate.setPriorBaseNegativeDirection(priorBaseNegativeDirection);
 
                 // TODO: make this parameterizable
-                final LocusReadPile t2 = filterReads(ref, tumorReadPile.finalPileup, true, !NO_BAQ);
+                final LocusReadPile t2 = filterReads(ref, tumorReadPile.finalPileup, true);
 
                 // if there are no reads remaining, abandon this theory
                 if ( !MTAC.FORCE_OUTPUT && t2.finalPileupReads.size() == 0) { continue; }
@@ -601,11 +593,11 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
 
                 //TODO: shouldn't this be f2 in the lod calculation instead of the strand specific f values?
                 // TODO: clean up use of forward/reverse vs positive/negative (prefer the latter since GATK uses it)
-                ReadBackedPileup forwardPileup = filterReads(ref, tumorReadPile.finalPileupPositiveStrand, true, !NO_BAQ).finalPileupPositiveStrand;
+                ReadBackedPileup forwardPileup = filterReads(ref, tumorReadPile.finalPileupPositiveStrand, true).finalPileupPositiveStrand;
                 double f2forward = LocusReadPile.estimateAlleleFraction(forwardPileup, upRef, altAllele);
                 candidate.setTumorLodFStarForward(t2.calculateAltVsRefLOD(forwardPileup, (byte)altAllele, f2forward, 0.0, null));
 
-                ReadBackedPileup reversePileup = filterReads(ref,tumorReadPile.finalPileupNegativeStrand, true, !NO_BAQ).finalPileupNegativeStrand;
+                ReadBackedPileup reversePileup = filterReads(ref,tumorReadPile.finalPileupNegativeStrand, true).finalPileupNegativeStrand;
                 double f2reverse = LocusReadPile.estimateAlleleFraction(reversePileup, upRef, altAllele);
                 candidate.setTumorLodFStarReverse(t2.calculateAltVsRefLOD(reversePileup, (byte)altAllele, f2reverse, 0.0, null));
 
@@ -660,18 +652,18 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 candidate.setTumorAltReverseOffsetsInRead(getReverseOffsetsInRead(mutantPileup));
 
                 if (candidate.getTumorAltForwardOffsetsInRead().size() > 0) {
-                    double[] offsets = convertIntegersToDoubles(candidate.getTumorAltForwardOffsetsInRead());
-                    double median = getMedian(offsets);
+                    double[] offsets = MuTectStats.convertIntegersToDoubles(candidate.getTumorAltForwardOffsetsInRead());
+                    double median = MuTectStats.getMedian(offsets);
                     candidate.setTumorForwardOffsetsInReadMedian(median);
-                    candidate.setTumorForwardOffsetsInReadMad(calculateMAD(offsets, median));
+                    candidate.setTumorForwardOffsetsInReadMad(MuTectStats.calculateMAD(offsets, median));
                 }
 
 
                 if (candidate.getTumorAltReverseOffsetsInRead().size() > 0) {
-                    double[] offsets = convertIntegersToDoubles(candidate.getTumorAltReverseOffsetsInRead());
-                    double median = getMedian(offsets);
+                    double[] offsets = MuTectStats.convertIntegersToDoubles(candidate.getTumorAltReverseOffsetsInRead());
+                    double median = MuTectStats.getMedian(offsets);
                     candidate.setTumorReverseOffsetsInReadMedian(median);
-                    candidate.setTumorReverseOffsetsInReadMad(calculateMAD(offsets, median));
+                    candidate.setTumorReverseOffsetsInReadMad(MuTectStats.calculateMAD(offsets, median));
                 }
 
 
@@ -682,7 +674,6 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 if (MTAC.FORCE_ALLELES) {
                     out.println(callStatsGenerator.generateCallStats(candidate));
                 } else {
-//                    System.out.println("putting in " + altAllele + " with lod " + candidate.getInitialTumorLod());
                     messageByTumorLod.put(candidate.getInitialTumorLod(), candidate);
                 }
             }
@@ -763,95 +754,8 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         return (window.getStart() <= position && position <= window.getStop());
     }
 
-    public static class FisherData {
-        public int a;
-        public int b;
-        public int c;
-        public int d;
-        public double p;
-        public double maxPosP;
-        public double maxNegP;
 
-        public FisherData(int a, int b, int c, int d, double p, double maxPosP, double maxNegP) {
-            this.a = a;
-            this.b = b;
-            this.c = c;
-            this.d = d;
-            this.p = p;
-            this.maxPosP = maxPosP;
-            this.maxNegP = maxNegP;
-        }
 
-        public String dataToString() {
-            StringBuilder sb = new StringBuilder();
-            sb.append("(");
-            sb.append(a).append(",");
-            sb.append(b).append(",");
-            sb.append(c).append(",");
-            sb.append(d).append(")");
-            return sb.toString();
-        }
-
-        public int getA() {
-            return a;
-        }
-
-        public int getB() {
-            return b;
-        }
-
-        public int getC() {
-            return c;
-        }
-
-        public int getD() {
-            return d;
-        }
-
-        public double getP() {
-            return p;
-        }
-
-        public double getMaxPosP() {
-            return maxPosP;
-        }
-
-        public void setMaxPosP(double maxPosP) {
-            this.maxPosP = maxPosP;
-        }
-
-        public double getMaxNegP() {
-            return maxNegP;
-        }
-
-        public void setMaxNegP(double maxNegP) {
-            this.maxNegP = maxNegP;
-        }
-    }
-
-    private FisherData calculateClippingBias(LocusReadPile refPile, LocusReadPile mutantPile) {
-        // Construct a 2x2 contingency table of
-        //            not-clipped  clipped
-        //      REF    a            b
-        //      MUT    c            d
-        //
-        // and return an array of {a,b,c,d,two-tailed-p}
-
-        int a = 0, b = 0, c = 0, d = 0;
-        for (SAMRecord rec : refPile.finalPileupReads) {
-            if (isReadHeavilySoftClipped(rec)) { b++;} else { a++; }
-        }
-        for (SAMRecord rec : mutantPile.finalPileupReads) {
-            if (isReadHeavilySoftClipped(rec)) { d++;} else { c++; }
-        }
-
-        final double p = fisher.getTwoTailedP(a,b,c,d);
-        int n = c+d;
-        final double pmaxpos = fisher.getTwoTailedP(a,b,n,0);
-        final double pmaxneg = fisher.getTwoTailedP(a,b,0,n);
-
-        return new FisherData(a,b,c,d,p, pmaxpos, pmaxneg);
-    }
 
     // TODO: we can do this more cheaply with a GATKSAMRecord...
     private boolean isReadHeavilySoftClipped(SAMRecord rec) {
@@ -867,7 +771,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         return ((float) clipped / (float)total >= MTAC.HEAVILY_CLIPPED_READ_FRACTION);
     }
 
-    private FisherData calculateStrandBias(LocusReadPile refPile, LocusReadPile mutantPile) {
+    private FisherExact.FisherData calculateStrandBias(LocusReadPile refPile, LocusReadPile mutantPile) {
         // Construct a 2x2 contingency table of
         //            pos     neg
         //      REF    a       b
@@ -894,11 +798,11 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         final double pmaxpos = fisher.getTwoTailedP(a,b,n,0);
         final double pmaxneg = fisher.getTwoTailedP(a,b,0,n);
 
-        return new FisherData(a,b,c,d,p, pmaxpos, pmaxneg);
+        return new FisherExact.FisherData(a,b,c,d,p, pmaxpos, pmaxneg);
     }
 
 
-    private FisherData calculatePerfectStrandBias(LocusReadPile mutantPile) {
+    private FisherExact.FisherData calculatePerfectStrandBias(LocusReadPile mutantPile) {
         try {
             int c = 0, d = 0;
             for (SAMRecord rec : mutantPile.finalPileupReads) {
@@ -911,7 +815,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
             double pmax = bd.cumulativeProbability(0);
             double p = bd.cumulativeProbability(Math.min(c,d));
 
-            return new FisherData(0,0,c,d,p,pmax, pmax);
+            return new FisherExact.FisherData(0,0,c,d,p,pmax, pmax);
         } catch (MathException me) {
             throw new RuntimeException("Error in ApacheMath"+me.getMessage(), me);
         }
@@ -946,9 +850,6 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
     private static final double PERFECT_STRAND_BIAS_THRESHOLD = .05d;
     private static final double STRAND_BIAS_THRESHOLD = .05d;
 
-    private static final int QUALITY_RST_MEDIAN_SHIFT_THRESHOLD = 4;
-    private static final double QUALITY_RST_PVALUE_THRESHOLD = .005;
-
     private void performRejection(CandidateMutation candidate) {
         if (candidate.getTumorLodFStar() < MTAC.TUMOR_LOD_THRESHOLD) {
             candidate.addRejectionReason("fstar_tumor_lod");
@@ -981,17 +882,13 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
             candidate.addRejectionReason("alt_allele_in_normal");
         }
 
-//        if (candidate.getNormalArtifactLodNF() > MTAC.NORMAL_ARTIFACT_LOD_THRESHOLD) {
-//            candidate.addRejectionReason("normal_artifact_lod");
-//        }
-
         if ( (candidate.getTumorForwardOffsetsInReadMedian() != null && candidate.getTumorForwardOffsetsInReadMedian() <= MTAC.PIR_MEDIAN_THRESHOLD && candidate.getTumorForwardOffsetsInReadMad() != null && candidate.getTumorForwardOffsetsInReadMad() <= MTAC.PIR_MAD_THRESHOLD) ||
               candidate.getTumorReverseOffsetsInReadMedian() != null && candidate.getTumorReverseOffsetsInReadMedian() <= MTAC.PIR_MEDIAN_THRESHOLD && candidate.getTumorReverseOffsetsInReadMad() != null && candidate.getTumorReverseOffsetsInReadMad() <= MTAC.PIR_MAD_THRESHOLD ) {
             candidate.addRejectionReason("clustered_read_position");
 
         }
 
-
+        // TODO: clean up strand outputs to only the ones we use...
         candidate.setPositiveDirectionPowered(
                 candidate.getPerfectStrandBias().getMaxPosP() < PERFECT_STRAND_BIAS_THRESHOLD &&
                 candidate.getStrandBias().getMaxPosP() < STRAND_BIAS_THRESHOLD);
@@ -1006,18 +903,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
             candidate.addRejectionReason("ERROR: Unable to calculate Strand Bias Score");
         }
 
-        // TODO: parameterize this 2.0 value
         // TODO: sync naming (is it positive or forward)?
-        // test both the positive and negative direction.  If you're "at risk" for an artifact in a direction you need
-        // to observerve a LOD score > than the threshold in the OPPOSITE direction
-//        if (candidate.isPositiveDirectionAtRisk() && candidate.isPositiveDirectionPowered() && candidate.getTumorLodFStarReverse() < 2.0) {
-//            candidate.addRejectionReason("positive_strand_artifact");
-//        }
-//
-//        if (candidate.isNegativeDirectionAtRisk() && candidate.isNegativeDirectionPowered() && candidate.getTumorLodFStarForward() < 2.0) {
-//            candidate.addRejectionReason("negative_strand_artifact");
-//        }
-
         if (
                 (candidate.getPowerToDetectNegativeStrandArtifact() >= MTAC.STRAND_ARTIFACT_POWER_THRESHOLD && candidate.getTumorLodFStarForward() < MTAC.STRAND_ARTIFACT_LOD_THRESHOLD) ||
                 (candidate.getPowerToDetectPositiveStrandArtifact() >= MTAC.STRAND_ARTIFACT_POWER_THRESHOLD && candidate.getTumorLodFStarReverse() < MTAC.STRAND_ARTIFACT_LOD_THRESHOLD)
@@ -1042,79 +928,9 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
             }
         }
 
-
-        /*
-        String judgementString = "REJECT";
-        if (!candidate.isRejected()) {
-            // now that we know it's a good event in the tumor, is it SOMATIC / GERMLINE or VARIANT?
-
-            double nLodThreshold = (candidate.isGermlineAtRisk())?MTAC.NORMAL_DBSNP_LOD_THRESHOLD:MTAC.NORMAL_LOD_THRESHOLD;
-            double nPower = (candidate.isGermlineAtRisk())?candidate.getNormalPowerWithSNPPrior():candidate.getNormalPowerNoSNPPrior();
-
-
-            // if we passed the Normal LOD threshold, it's somatic.  If we didn't it's either germline (if we
-            // had power to have passed the threshold and only germline expected filters ) or just variant
-            if (candidate.getInitialNormalLod() >= nLodThreshold) {
-                judgementString = "KEEP";
-            } else {
-
-                if (nPower >= MTAC.SOMATIC_CLASSIFICATION_NORMAL_POWER_THRESHOLD) {
-                    // this is "GERMLINE" in the paper, but calling it out as GERMLINE
-                    // might make people think that we are trying to call germline variants
-                    // well (which we are not) so we just REJECT it
-                    candidate.addRejectionReason("normal_lod");
-                    judgementString = "REJECT";
-                } else {
-                    judgementString = "VARIANT";
-                }
-            }
-        }
-        candidate.setJudgement(judgementString);
-        */
     }
 
-    private double calculateMAD(double[] dd, double median) {
-        double[] dev = new double[dd.length];
-        for(int i=0; i<dd.length; i++) {
-            dev[i] = Math.abs(dd[i] - median);
-        }
-        return getMedian(dev);
 
-    }
-
-    private double getMedian(double[] data) {
-        Arrays.sort(data);
-        Double result;
-
-        if (data.length % 2 == 1) {
-            // If the number of entries in the list is not even.
-
-            // Get the middle value.
-            // You must floor the result of the division to drop the
-            // remainder.
-            result = data[(int) Math.floor(data.length/2) ];
-
-        } else {
-            // If the number of entries in the list are even.
-
-            // Get the middle two values and average them.
-            Double lowerMiddle = data[data.length/2 ];
-            Double upperMiddle = data[data.length/2 - 1 ];
-            result = (lowerMiddle + upperMiddle) / 2;
-        }
-
-        return result;
-    }
-
-    public static double[] convertIntegersToDoubles(List<Integer> integers)
-    {
-        double[] ret = new double[integers.size()];
-        for (int i=0; i < ret.length; i++)
-        {
-            ret[i] = integers.get(i);
-        }
-        return ret;
-    }
 
     public Integer treeReduce(Integer lhs, Integer rhs) {
         return 0;
@@ -1134,11 +950,10 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
 
     int MAX_READ_MISMATCH_QUALITY_SCORE_SUM = 100;
     private static Character MAPPED_BY_MATE = 'M';
-    private BAQ baqHMM = new BAQ();
     // TODO: or should we be using this? baqHMM = new BAQ(1e-3, 0.1, bw, (byte)0, true); from the BAQ unit test?
     IndexedFastaSequenceFile refReader;
 
-    private LocusReadPile filterReads(final ReferenceContext ref, final ReadBackedPileup pile, boolean filterMateRescueReads, boolean applyBAQ) {
+    private LocusReadPile filterReads(final ReferenceContext ref, final ReadBackedPileup pile, boolean filterMateRescueReads) {
         ArrayList<PileupElement> newPileupElements = new ArrayList<PileupElement>();
 
         for ( PileupElement p : pile ) {
@@ -1163,11 +978,6 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 continue;
             }
 
-            // apply BAQ
-            if (applyBAQ) {
-                baqHMM.baqRead(read, refReader, BAQ.CalculationMode.RECALCULATE, BAQ.QualityMode.OVERWRITE_QUALS);
-            }
-
             // if we're here... we passed all the read filters!
             newPileupElements.add(new PileupElement(read, p.getOffset(), p.isDeletion(), p.isBeforeDeletionStart(), p.isAfterDeletionEnd(), p.isBeforeInsertion(), p.isAfterInsertion(),p.isNextToSoftClip()));
 
@@ -1181,135 +991,6 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
 
         return newPile;
     }
-
-    /**
-     * Calculate the fraction of mismatches to the altAllele against all other
-     * alleles from the offset position in the read to the end of the read
-     *
-     * @param altAllele
-     * @return
-     */
-    private float getAltAlleleMismatchRate(final SAMRecord read, final List<Mismatch> mismatches, final int offset, final char altAllele) {
-        int mmToAlt = 0;
-        int mmToOther = 0;
-        for (final Mismatch mm : mismatches) {
-            if ((read.getReadNegativeStrandFlag() && mm.offset < offset) ||
-                (!read.getReadNegativeStrandFlag() && mm.offset > offset) ) {
-                if (mm.mismatchBase == altAllele) {
-                    mmToAlt++;
-                } else {
-                    mmToOther++;
-                }
-            }
-        }
-
-        // TODO: use fischer exact test?
-        
-        return (float) (mmToAlt + 1) / (float) (mmToAlt + mmToOther + 4);
-    }
-
-
-
-
-
-    // ----------------------------------- PRIVATE IN IntervalCleanerWalker
-    public static final int MAX_QUAL = 99;
-
-    private static class Mismatch {
-        SAMRecord read;
-        int offset;
-        long position;
-        char mismatchBase;
-        int qualityScore;
-
-        private Mismatch(final SAMRecord read, final int offset, final long position, final char mismatchBase, final int qualityScore) {
-            this.read = read;
-            this.offset = offset;
-            this.position = position;
-            this.mismatchBase = mismatchBase;
-            this.qualityScore = qualityScore;
-        }
-    }
-
-    private int mismatchQualitySum(final SAMRecord read, final String refSeq, final int refIndex, final int minMismatchQualityScore) {
-        final List<Mismatch> mismatches = getMismatches(read, refSeq, refIndex);
-        return mismatchQualitySum(mismatches, minMismatchQualityScore);
-    }
-
-    private int mismatchQualitySum(final List<Mismatch> mismatches, final int minMismatchQualityScore) {
-        int sum = 0;
-        for(final Mismatch mm : mismatches) {
-            if (mm.qualityScore >= minMismatchQualityScore) {
-                sum += mm.qualityScore;
-            }
-        }
-        return sum;
-    }
-
-
-
-
-    /**
-     * Returns a list of position
-     * @param refSeq
-     * @param refIndex
-     * @return
-     */
-    private static List<Mismatch> getMismatches(final SAMRecord read, final String refSeq, int refIndex) {
-        final List<Mismatch> mismatches = new ArrayList<Mismatch>();
-
-        final String readSeq = read.getReadString();
-        final String quals = read.getBaseQualityString();
-        int readIndex = 0;
-        int sum = 0;
-        final Cigar c = read.getCigar();
-        for (int i = 0 ; i < c.numCigarElements() ; i++) {
-            final CigarElement ce = c.getCigarElement(i);
-            switch ( ce.getOperator() ) {
-                case M:
-                    for (int j = 0 ; j < ce.getLength() ; j++, refIndex++, readIndex++ ) {
-                        // TODO: what is this case????
-                        if ( refIndex >= refSeq.length() ) {
-                            sum += MAX_QUAL;
-                        } else {
-                            final char readBase = Character.toUpperCase(readSeq.charAt(readIndex));
-                            final char refBase = Character.toUpperCase(refSeq.charAt(refIndex));
-
-                            if ( readBase != refBase ) {
-                                final int qual = quals.charAt(readIndex) - 33;
-                                mismatches.add(new Mismatch(read, readIndex, refIndex, readBase, qual));
-                            }
-                        }
-                    }
-                    break;
-                case I:
-                    readIndex += ce.getLength();
-                    break;
-                case D:
-                    refIndex += ce.getLength();
-                    break;
-            }
-
-        }
-        return mismatches;
-    }
-
-    static LinkedHashMap sortByDescendingValue(Map map) {
-     List list = new LinkedList(map.entrySet());
-     Collections.sort(list, new Comparator() {
-          public int compare(Object o1, Object o2) {
-               return -1 * ((Comparable) ((Map.Entry) (o1)).getValue())
-              .compareTo(((Map.Entry) (o2)).getValue());
-          }
-     });
-    // logger.info(list);
-    LinkedHashMap result = new LinkedHashMap();
-    for (Iterator it = list.iterator(); it.hasNext();) {
-        Map.Entry entry = (Map.Entry)it.next();
-        result.put(entry.getKey(), entry.getValue());
-     }
-    return result;
-}
 
     public enum ReadSource { Tumor, Normal, Control }
     

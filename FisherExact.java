@@ -5,6 +5,71 @@ public class FisherExact {
     private double[] f;
     int maxSize;
 
+    public static class FisherData {
+        public int a;
+        public int b;
+        public int c;
+        public int d;
+        public double p;
+        public double maxPosP;
+        public double maxNegP;
+
+        public FisherData(int a, int b, int c, int d, double p, double maxPosP, double maxNegP) {
+            this.a = a;
+            this.b = b;
+            this.c = c;
+            this.d = d;
+            this.p = p;
+            this.maxPosP = maxPosP;
+            this.maxNegP = maxNegP;
+        }
+
+        public String dataToString() {
+            StringBuilder sb = new StringBuilder();
+            sb.append("(");
+            sb.append(a).append(",");
+            sb.append(b).append(",");
+            sb.append(c).append(",");
+            sb.append(d).append(")");
+            return sb.toString();
+        }
+
+        public int getA() {
+            return a;
+        }
+
+        public int getB() {
+            return b;
+        }
+
+        public int getC() {
+            return c;
+        }
+
+        public int getD() {
+            return d;
+        }
+
+        public double getP() {
+            return p;
+        }
+
+        public double getMaxPosP() {
+            return maxPosP;
+        }
+
+        public void setMaxPosP(double maxPosP) {
+            this.maxPosP = maxPosP;
+        }
+
+        public double getMaxNegP() {
+            return maxNegP;
+        }
+
+        public void setMaxNegP(double maxNegP) {
+            this.maxNegP = maxNegP;
+        }
+    }
 
     /**
      * constructor for FisherExact table
