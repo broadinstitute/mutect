@@ -40,6 +40,9 @@ public class MuTectArgumentCollection {
     @Argument(fullName = "force_alleles", required = false, doc="force output for all alleles at each site")
     public boolean FORCE_ALLELES = false;
 
+    @Argument(fullName = "only_passing_calls", required = false, doc="only emit passing calls")
+    public boolean ONLY_PASSING_CALLS = false;
+
     @Argument(fullName = "initial_tumor_lod", required = false, doc = "Initial LOD threshold for calling tumor variant")
     public float INITIAL_TUMOR_LOD_THRESHOLD = 4.0f;
 

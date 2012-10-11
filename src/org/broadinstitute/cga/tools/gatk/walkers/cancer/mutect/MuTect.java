@@ -6,12 +6,17 @@ import java.util.*;
 import net.sf.picard.reference.IndexedFastaSequenceFile;
 import net.sf.samtools.*;
 
+import org.broadinstitute.sting.gatk.arguments.DbsnpArgumentCollection;
+import org.broadinstitute.sting.gatk.walkers.annotator.VariantAnnotatorEngine;
+import org.broadinstitute.sting.gatk.walkers.genotyper.UnifiedArgumentCollection;
+import org.broadinstitute.sting.gatk.walkers.genotyper.UnifiedGenotyperEngine;
+import org.broadinstitute.sting.utils.GenomeLoc;
+import org.broadinstitute.sting.utils.codecs.vcf.*;
+import org.broadinstitute.sting.utils.variantcontext.*;
+import org.broadinstitute.sting.utils.variantcontext.writer.VariantContextWriter;
 import org.apache.commons.lang.math.NumberUtils;
-import org.apache.commons.math.MathException;
 import org.apache.commons.math.distribution.BetaDistribution;
 import org.apache.commons.math.distribution.BetaDistributionImpl;
-import org.apache.commons.math.distribution.BinomialDistribution;
-import org.apache.commons.math.distribution.BinomialDistributionImpl;
 import org.broadinstitute.sting.commandline.*;
 import org.broadinstitute.sting.gatk.contexts.AlignmentContext;
 import org.broadinstitute.sting.gatk.contexts.ReferenceContext;
@@ -19,14 +24,12 @@ import org.broadinstitute.sting.gatk.datasources.reads.SAMReaderID;
 import org.broadinstitute.sting.gatk.refdata.RefMetaDataTracker;
 import org.broadinstitute.sting.gatk.walkers.*;
 import org.broadinstitute.sting.utils.BaseUtils;
-import org.broadinstitute.sting.utils.GenomeLoc;
 import org.broadinstitute.sting.utils.exceptions.UserException;
 import org.broadinstitute.sting.utils.pileup.ReadBackedPileup;
 import org.broadinstitute.sting.utils.pileup.PileupElement;
 import org.broadinstitute.sting.utils.pileup.ReadBackedPileupImpl;
 import org.broadinstitute.sting.utils.sam.AlignmentUtils;
 import org.broadinstitute.sting.utils.sam.GATKSAMRecord;
-import org.broadinstitute.sting.utils.variantcontext.VariantContext;
 
 @PartitionBy(PartitionType.LOCUS)
 @BAQMode()
@@ -48,6 +51,9 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
     /***************************************/
     @Output(doc="Call-stats output")
     PrintStream out;
+
+    @Output(doc="VCF output of mutation candidates",shortName="vcf", fullName="vcf", required=false)
+    protected VariantContextWriter vcf = null;
 
     /***************************************/
     // Reference Metadata inputs
@@ -228,9 +234,18 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
             MTAC.INITIAL_TUMOR_LOD_THRESHOLD = -Float.MAX_VALUE;
         }
 
-        // write out the call stats header
+        // initialize the call-stats file
         out.println("## muTector v1.0." + VERSION.split(" ")[1]);
         out.println(callStatsGenerator.generateHeader());
+
+        // initialize the VCF output
+        if (vcf != null) {
+            Set<String> samples = new HashSet<String>();
+            samples.add(MTAC.TUMOR_SAMPLE_NAME);
+            samples.add(MTAC.NORMAL_SAMPLE_NAME);
+            Set<VCFHeaderLine> headerInfo = getVCFHeaderInfo(MTAC);
+            vcf.writeHeader(new VCFHeader(headerInfo, samples));
+        }
 
         lastTime = System.currentTimeMillis();
     }
@@ -411,6 +426,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 candidate.setPanelOfNormalsVC(panelOfNormalsVC.isEmpty()?null:panelOfNormalsVC.iterator().next()); // if there are multiple, we're just grabbing the first
                 candidate.setCosmicSite(!cosmicVC.isEmpty());
                 candidate.setDbsnpSite(!dbsnpVC.isEmpty());
+                candidate.setDbsnpVC(dbsnpVC.isEmpty()?null:dbsnpVC.iterator().next());
                 candidate.setTumorF(tumorReadPile.estimateAlleleFraction(upRef, altAllele));
 
                 if (!MTAC.FORCE_OUTPUT && candidate.getTumorF() < MTAC.TUMOR_F_PRETEST) {
@@ -652,6 +668,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 // FIXME: this is inefficient.  Put everything into the data structure (with Candidate as the value) and then print it outside the main loop
                 if (MTAC.FORCE_ALLELES) {
                     out.println(callStatsGenerator.generateCallStats(candidate));
+                    // TODO: should force alleles be enabled in VCF
                 } else {
                     messageByTumorLod.put(candidate.getInitialTumorLod(), candidate);
                 }
@@ -673,7 +690,17 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
 
             // write out the call stats for the "best" candidate
             if (!messageByTumorLod.isEmpty()) {
-                out.println(callStatsGenerator.generateCallStats(messageByTumorLod.lastEntry().getValue()));
+                CandidateMutation m = messageByTumorLod.lastEntry().getValue();
+
+                // only output passing calls OR rejected sites if ONLY_PASSING_CALLS is not specified
+                if (!m.isRejected() || (m.isRejected() && !MTAC.ONLY_PASSING_CALLS)) {
+
+                    out.println(callStatsGenerator.generateCallStats(m));
+                    if (vcf != null) {
+                        VariantContext vc = generateVC(m);
+                        vcf.add(vc);
+                    }
+                }
             }
 
             return -1;
@@ -929,6 +956,82 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         
         // unexpected condition
         throw new RuntimeException("Unable to determine read source (tumor,normal,control) for read " + read.getReadName());               
+    }
+
+    private static Set<VCFHeaderLine> getVCFHeaderInfo(final MuTectArgumentCollection MTAC) {
+        Set<VCFHeaderLine> headerInfo = new HashSet<VCFHeaderLine>();
+
+
+        headerInfo.add(new VCFFilterHeaderLine("REJECT", "Rejected as a confident somatic mutation"));
+        headerInfo.add(new VCFFilterHeaderLine("PASS", "Accept as a confident somatic mutation"));
+
+        // TODO: what fields do we need here
+        VCFStandardHeaderLines.addStandardInfoLines(headerInfo, true,
+                VCFConstants.MAPPING_QUALITY_ZERO_KEY,
+                VCFConstants.DBSNP_KEY,
+                VCFConstants.SOMATIC_KEY);
+
+        // TODO copy from TCGA spec..
+        headerInfo.add(new VCFInfoHeaderLine("VT", VCFHeaderLineCount.INTEGER, VCFHeaderLineType.String, "Variant type, can be SNP, INS or DEL"));
+
+
+        VCFStandardHeaderLines.addStandardFormatLines(headerInfo, true,
+                VCFConstants.GENOTYPE_KEY,
+                VCFConstants.GENOTYPE_QUALITY_KEY,
+                VCFConstants.DEPTH_KEY,
+                VCFConstants.GENOTYPE_ALLELE_DEPTHS,
+                VCFConstants.GENOTYPE_PL_KEY);
+
+        // cancer-specific
+        // TODO: push to VCFConstants in GATK
+        headerInfo.add(new VCFFormatHeaderLine("FA", VCFHeaderLineCount.A, VCFHeaderLineType.Float, "Allele fraction of the alternate allele with regard to reference"));
+        headerInfo.add(new VCFFormatHeaderLine("SS", VCFHeaderLineCount.INTEGER, VCFHeaderLineType.Integer, "Variant status relative to non-adjacent Normal,0=wildtype,1=germline,2=somatic,3=LOH,4=post-transcriptional modification,5=unknown"));
+        headerInfo.add(new VCFFormatHeaderLine(VCFConstants.RMS_BASE_QUALITY_KEY, VCFHeaderLineCount.A, VCFHeaderLineType.Float, "Average base quality for reads supporting alleles"));
+
+        return headerInfo;
+    }
+
+    private VariantContext generateVC(CandidateMutation m) {
+        GenomeLoc l = m.getLocation();
+        List<Allele> alleles = Arrays.asList(Allele.create((byte) m.getRefAllele(), true), Allele.create((byte) m.getAltAllele()));
+        List<Allele> tumorAlleles = Arrays.asList(Allele.create((byte) m.getRefAllele(), true), Allele.create((byte) m.getAltAllele()));
+        List<Allele> normalAlleles = Arrays.asList(Allele.create((byte) m.getRefAllele(), true));
+
+        GenotypeBuilder tumorGenotype =
+                new GenotypeBuilder(m.getTumorSampleName(), tumorAlleles)
+                        .AD(new int[]{m.getInitialTumorRefCounts(), m.getInitialTumorAltCounts()})
+                        .attribute("FA", m.getTumorF())
+                        .DP(m.getInitialTumorReadDepth());
+
+        if (m.getInitialTumorAltCounts() > 0) {
+            tumorGenotype.attribute(VCFConstants.RMS_BASE_QUALITY_KEY,  m.getInitialTumorAltQualitySum() / m.getInitialTumorAltCounts()); // TODO: is this TCGA compliant?
+        }
+
+        GenotypeBuilder normalGenotype =
+                new GenotypeBuilder(m.getNormalSampleName(), normalAlleles)
+                        .AD(new int[]{m.getInitialNormalRefCounts(), m.getInitialNormalAltCounts()})
+                        .attribute("FA", m.getNormalF())
+                        .DP(m.getInitialNormalReadDepth())
+                        .attribute(VCFConstants.RMS_BASE_QUALITY_KEY, "." );    // TODO: is this TCGA-compliant?
+
+        VariantContextBuilder vc =
+                new VariantContextBuilder("", l.getContig(), l.getStart(), l.getStop(), alleles);
+
+        vc.filter(m.isRejected()?"REJECT":"PASS");
+        if(m.getDbsnpVC() != null) {
+            vc.id(m.getDbsnpVC().getID());
+            vc.attribute(VCFConstants.DBSNP_KEY, null);
+        }
+        if (!m.isRejected()) {
+            vc.attribute(VCFConstants.SOMATIC_KEY, null);
+            vc.attribute("VT", "SNP");
+            tumorGenotype.attribute("SS", 2); // TODO: extract these TCGA specific attributes to a class
+        }
+
+        // add the genotype objects
+        vc.genotypes(tumorGenotype.make(), normalGenotype.make());
+
+        return vc.make();
     }
 
 }

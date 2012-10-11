@@ -16,6 +16,7 @@ public class CandidateMutation {
     private boolean dbsnpSite = false;
     private boolean cosmicSite = false;
     private VariantContext panelOfNormalsVC;
+    private VariantContext dbsnpVC;
     private boolean covered = false;
 
     private double power;
@@ -145,6 +146,14 @@ public class CandidateMutation {
 
     public void setDbsnpSite(boolean dbsnpSite) {
         this.dbsnpSite = dbsnpSite;
+    }
+
+    public VariantContext getDbsnpVC() {
+        return dbsnpVC;
+    }
+
+    public void setDbsnpVC(VariantContext dbsnpVC) {
+        this.dbsnpVC = dbsnpVC;
     }
 
     public boolean isCovered() {
