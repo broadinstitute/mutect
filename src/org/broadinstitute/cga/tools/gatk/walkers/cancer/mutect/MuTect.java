@@ -972,7 +972,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 VCFConstants.SOMATIC_KEY);
 
         // TODO copy from TCGA spec..
-        headerInfo.add(new VCFInfoHeaderLine("VT", VCFHeaderLineCount.INTEGER, VCFHeaderLineType.String, "Variant type, can be SNP, INS or DEL"));
+        headerInfo.add(new VCFInfoHeaderLine("VT", 1, VCFHeaderLineType.String, "Variant type, can be SNP, INS or DEL"));
 
 
         VCFStandardHeaderLines.addStandardFormatLines(headerInfo, true,
@@ -985,7 +985,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         // cancer-specific
         // TODO: push to VCFConstants in GATK
         headerInfo.add(new VCFFormatHeaderLine("FA", VCFHeaderLineCount.A, VCFHeaderLineType.Float, "Allele fraction of the alternate allele with regard to reference"));
-        headerInfo.add(new VCFFormatHeaderLine("SS", VCFHeaderLineCount.INTEGER, VCFHeaderLineType.Integer, "Variant status relative to non-adjacent Normal,0=wildtype,1=germline,2=somatic,3=LOH,4=post-transcriptional modification,5=unknown"));
+        headerInfo.add(new VCFFormatHeaderLine("SS", 1, VCFHeaderLineType.Integer, "Variant status relative to non-adjacent Normal,0=wildtype,1=germline,2=somatic,3=LOH,4=post-transcriptional modification,5=unknown"));
         headerInfo.add(new VCFFormatHeaderLine(VCFConstants.RMS_BASE_QUALITY_KEY, VCFHeaderLineCount.A, VCFHeaderLineType.Float, "Average base quality for reads supporting alleles"));
 
         return headerInfo;
