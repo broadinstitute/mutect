@@ -210,6 +210,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
             MTAC.NORMAL_LOD_THRESHOLD = -1 * Float.MAX_VALUE;
             MTAC.NORMAL_DBSNP_LOD_THRESHOLD = -1 * Float.MAX_VALUE;
             MTAC.NORMAL_ARTIFACT_LOD_THRESHOLD = Float.MAX_VALUE;
+            MTAC.NORMAL_SAMPLE_NAME = "none";
         }
 
         this.contaminantAlternateFraction = Math.max(MTAC.MINIMUM_MUTATION_CELL_FRACTION, MTAC.FRACTION_CONTAMINATION);
