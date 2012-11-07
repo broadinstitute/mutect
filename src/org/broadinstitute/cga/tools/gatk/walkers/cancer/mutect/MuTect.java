@@ -1027,6 +1027,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
             vc.attribute(VCFConstants.SOMATIC_KEY, null);
             vc.attribute("VT", "SNP");
             tumorGenotype.attribute("SS", 2); // TODO: extract these TCGA specific attributes to a class
+            normalGenotype.attribute("SS", 0); // TODO: extract these TCGA specific attributes to a class
         }
 
         // add the genotype objects
