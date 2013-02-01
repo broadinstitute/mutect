@@ -228,7 +228,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
             Set<String> samples = new HashSet<String>();
             samples.add(MTAC.TUMOR_SAMPLE_NAME);
             samples.add(MTAC.NORMAL_SAMPLE_NAME);
-            Set<VCFHeaderLine> headerInfo = getVCFHeaderInfo(MTAC);
+            Set<VCFHeaderLine> headerInfo = VCFGenerator.getVCFHeaderInfo();
             vcf.writeHeader(new VCFHeader(headerInfo, samples));
         }
 
@@ -266,7 +266,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         if ( !MTAC.FORCE_OUTPUT && numberOfReads == 0) { return -1; }
 
         final char upRef = Character.toUpperCase(ref.getBaseAsChar());
-        String sequenceContext = createSequenceContext(ref, 3);
+        String sequenceContext = SequenceUtils.createSequenceContext(ref, 3);
 
         try {
 
@@ -449,16 +449,11 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                         }
                     }
 
-                    // TODO: when fragment-based calling is fully enabled in VARGL, this needs to change!
-                    // ignore bad bases, cap at mapping quality, and effectively have no threshold on quality (80) since this was done in our pileup
-                    // TODO: remove this local copy of qualToUse once we can just use the real thing!
-                    // TODO: move to this                           contaminantLikelihoods.add(base, qualToUse(pe, true, true, 0));
-                    contaminantLikelihoods.add(base, qualToUse(pe, false, false, 0));
+                    contaminantLikelihoods.add(base, pe.getQual());
                 }
                 double[] refHetHom = LocusReadPile.extractRefHetHom(contaminantLikelihoods, upRef, altAllele);
                 double contaminantLod = refHetHom[1] - refHetHom[0];
                 candidate.setContaminantLod(contaminantLod);
-
 
                 final QualitySums normQs = normalReadPile.qualitySums;
 
@@ -479,7 +474,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 candidate.setInitialNormalRefCounts(normQs.getCounts(upRef));
                 candidate.setInitialNormalReadDepth(normalReadPile.finalPileupReads.size());
 
-                // TODO: make this parameterizable
+                // TODO: parameterize filtering Mate-Rescued Reads (if someone wants to disable this)
                 final LocusReadPile t2 = filterReads(ref, tumorReadPile.finalPileup, true);
 
                 // if there are no reads remaining, abandon this theory
@@ -499,7 +494,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 candidate.setTumorLodFStar(tumorLod2);
 
                 //TODO: shouldn't this be f2 in the lod calculation instead of the strand specific f values?
-                // TODO: clean up use of forward/reverse vs positive/negative (prefer the latter since GATK uses it)
+                //TODO: clean up use of forward/reverse vs positive/negative (prefer the latter since GATK uses it)
                 ReadBackedPileup forwardPileup = filterReads(ref, tumorReadPile.finalPileupPositiveStrand, true).finalPileupPositiveStrand;
                 double f2forward = LocusReadPile.estimateAlleleFraction(forwardPileup, upRef, altAllele);
                 candidate.setTumorLodFStarForward(t2.calculateAltVsRefLOD(forwardPileup, (byte)altAllele, f2forward, 0.0));
@@ -551,11 +546,11 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 byte[] amq = mutantPileup.getMappingQuals();
                 candidate.setTumorAltMaxMapQ((amq.length==0)?0:NumberUtils.max(amq));
 
-                candidate.setStrandContingencyTable(getStrandContingencyTable(refPile, mutantPile));
+                candidate.setStrandContingencyTable(SequenceUtils.getStrandContingencyTable(refPile, mutantPile));
 
                 // start with just the tumor pile
-                candidate.setTumorAltForwardOffsetsInRead(getForwardOffsetsInRead(mutantPileup));
-                candidate.setTumorAltReverseOffsetsInRead(getReverseOffsetsInRead(mutantPileup));
+                candidate.setTumorAltForwardOffsetsInRead(SequenceUtils.getForwardOffsetsInRead(mutantPileup));
+                candidate.setTumorAltReverseOffsetsInRead(SequenceUtils.getReverseOffsetsInRead(mutantPileup));
 
                 if (candidate.getTumorAltForwardOffsetsInRead().size() > 0) {
                     double[] offsets = MuTectStats.convertIntegersToDoubles(candidate.getTumorAltForwardOffsetsInRead());
@@ -576,10 +571,8 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 // test to see if the candidate should be rejected
                 performRejection(candidate);
 
-                // FIXME: this is inefficient.  Put everything into the data structure (with Candidate as the value) and then print it outside the main loop
                 if (MTAC.FORCE_ALLELES) {
                     out.println(callStatsGenerator.generateCallStats(candidate));
-                    // TODO: should force alleles be enabled in VCF
                 } else {
                     messageByTumorLod.put(candidate.getInitialTumorLod(), candidate);
                 }
@@ -608,8 +601,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
 
                     out.println(callStatsGenerator.generateCallStats(m));
                     if (vcf != null) {
-                        VariantContext vc = generateVC(m);
-                        vcf.add(vc);
+                        vcf.add(VCFGenerator.generateVC(m));
                     }
                 }
             }
@@ -624,110 +616,8 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
     }
 
 
-    private String createSequenceContext(ReferenceContext ref, int size) {
-        // create a context of 3 bases before, then 'x' then three bases after
-        int offset = ref.getLocus().getStart() - ref.getWindow().getStart();
-        StringBuilder sb = new StringBuilder(7);
-
-        for(byte b : Arrays.copyOfRange(ref.getBases(), Math.max(0,offset - size), offset)) {
-            sb.append(Character.toUpperCase((char)b));
-        }
-        sb.append('x');
-        for(byte b : Arrays.copyOfRange(ref.getBases(), offset + 1, Math.min(ref.getBases().length,offset + 1 + size))) {
-            sb.append(Character.toUpperCase((char)b));
-        }
-        return sb.toString();
-    }
 
 
-    /**
-     * Helper function that returns the phred-scaled base quality score we should use for calculating
-     * likelihoods for a pileup element.  May return 0 to indicate that the observation is bad, and may
-     * cap the quality score by the mapping quality of the read itself.
-     *
-     * @param p
-     * @param ignoreBadBases
-     * @param capBaseQualsAtMappingQual
-     * @param minBaseQual
-     * @return
-     */
-    private static byte qualToUse(PileupElement p, boolean ignoreBadBases, boolean capBaseQualsAtMappingQual, int minBaseQual) {
-        if ( ignoreBadBases && !BaseUtils.isRegularBase(p.getBase()) )
-            return 0;
-
-        byte qual = p.getQual();
-
-        if ( qual > SAMUtils.MAX_PHRED_SCORE )
-            throw new UserException.MalformedBAM(p.getRead(), String.format("the maximum allowed quality score is %d, but a quality of %d was observed in read %s.  Perhaps your BAM incorrectly encodes the quality scores in Sanger format; see http://en.wikipedia.org/wiki/FASTQ_format for more details", SAMUtils.MAX_PHRED_SCORE, qual, p.getRead().getReadName()));
-        if ( capBaseQualsAtMappingQual )
-            qual = (byte)Math.min((int)p.getQual(), p.getMappingQual());
-        if ( (int)qual < minBaseQual )
-            qual = (byte)0;
-
-        return qual;
-    }
-
-
-    // TODO: see if this is cheaper with a GATKSAMRecord...
-    private boolean isReadHeavilySoftClipped(SAMRecord rec) {
-        int total = 0;
-        int clipped = 0;
-        for(CigarElement ce : rec.getCigar().getCigarElements()) {
-            total += ce.getLength();
-            if (ce.getOperator() == CigarOperator.SOFT_CLIP) {
-                clipped += ce.getLength();
-            }
-        }
-
-        return ((float) clipped / (float)total >= MTAC.HEAVILY_CLIPPED_READ_FRACTION);
-    }
-
-    private int[] getStrandContingencyTable(LocusReadPile refPile, LocusReadPile mutantPile) {
-        // Construct a 2x2 contingency table of
-        //            pos     neg
-        //      REF    a       b
-        //      MUT    c       d
-        //
-        // and return an array of {a,b,c,d}
-
-        int a = 0, b = 0, c = 0, d = 0;
-        for (SAMRecord rec : refPile.finalPileupReads) {
-            if (rec.getReadNegativeStrandFlag()) { b++;} else { a++; }
-        }
-        for (SAMRecord rec : mutantPile.finalPileupReads) {
-            if (rec.getReadNegativeStrandFlag()) { d++;} else { c++; }
-        }
-
-        int[] results = new int[]{a,b,c,d};
-        return results;
-    }
-
-
-    private List<Integer> getForwardOffsetsInRead(ReadBackedPileup p) {
-        return getOffsetsInRead(p, true);
-    }
-
-    private List<Integer> getReverseOffsetsInRead(ReadBackedPileup p) {
-        return getOffsetsInRead(p, false);
-    }
-
-    private List<Integer> getOffsetsInRead(ReadBackedPileup p, boolean useForwardOffsets) {
-        List<Integer> positions = new ArrayList<Integer>();
-        for(PileupElement pe : p) {
-            // TODO: maybe we should be doing start-site distribution, or a clipping aware offset?
-            GATKSAMRecord r = pe.getRead();
-
-
-            positions.add(
-                    Math.abs((int)(p.getLocation().getStart() - (useForwardOffsets?pe.getRead().getAlignmentStart():pe.getRead().getAlignmentEnd())))
-// TODO: the following code was for handling reduced reads, but if you use it on non-reduced reads it returns the wrong thing AND there is no way to tell if this is a reduced read!
-//                        Math.abs((int)(p.getLocation().getStart() -
-//                                (useForwardOffsets?r.getOriginalAlignmentStart():r.getOriginalAlignmentEnd())))
-            );
-        }
-
-        return positions;
-    }
 
     private void performRejection(CandidateMutation candidate) {
         if (candidate.getTumorLodFStar() < MTAC.TUMOR_LOD_THRESHOLD) {
@@ -748,9 +638,8 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
             candidate.addRejectionReason("possible_contamination");
         }
 
-        //TODO: clean up this rejection reason. no space and it's really "germline risk" or something
         if (candidate.isGermlineAtRisk() && candidate.getInitialNormalLod() < MTAC.NORMAL_DBSNP_LOD_THRESHOLD) {
-            candidate.addRejectionReason("DBSNP Site");
+            candidate.addRejectionReason("germline_risk");
         }
 
         if (candidate.getInitialNormalLod() < MTAC.NORMAL_LOD_THRESHOLD) {
@@ -827,12 +716,11 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
 
             // do we have to many mismatches overall?
             if (mismatchQualitySum > this.MAX_READ_MISMATCH_QUALITY_SCORE_SUM) {
-                //if (read.getReadString().charAt(offset) == altAllele) { out.println("MAXERR " + read.getReadName() + " that supported altAllele with " + mismatchScore + " mmqsum"); }
                 continue;
             }
 
             // is this a heavily clipped read?
-            if (isReadHeavilySoftClipped(read)) {
+            if (SequenceUtils.isReadHeavilySoftClipped(read, MTAC.HEAVILY_CLIPPED_READ_FRACTION)) {
                 continue;
             }
 
@@ -850,9 +738,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 new ReadBackedPileupImpl(ref.getLocus(), newPileupElements);
 
 
-        final LocusReadPile newPile = new LocusReadPile(newPileup, (char)ref.getBase(), 0, 0);
-
-        return newPile;
+        return new LocusReadPile(newPileup, (char)ref.getBase(), 0, 0);
     }
 
     public enum ReadSource { Tumor, Normal }
@@ -867,81 +753,8 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         throw new RuntimeException("Unable to determine read source (tumor,normal) for read " + read.getReadName());
     }
 
-    private static Set<VCFHeaderLine> getVCFHeaderInfo(final MuTectArgumentCollection MTAC) {
-        Set<VCFHeaderLine> headerInfo = new HashSet<VCFHeaderLine>();
 
 
-        headerInfo.add(new VCFFilterHeaderLine("REJECT", "Rejected as a confident somatic mutation"));
-        headerInfo.add(new VCFFilterHeaderLine("PASS", "Accept as a confident somatic mutation"));
 
-        // TODO: what fields do we need here
-        VCFStandardHeaderLines.addStandardInfoLines(headerInfo, true,
-                VCFConstants.MAPPING_QUALITY_ZERO_KEY,
-                VCFConstants.DBSNP_KEY,
-                VCFConstants.SOMATIC_KEY);
-
-        // TODO copy from TCGA spec..
-        headerInfo.add(new VCFInfoHeaderLine("VT", 1, VCFHeaderLineType.String, "Variant type, can be SNP, INS or DEL"));
-
-
-        VCFStandardHeaderLines.addStandardFormatLines(headerInfo, true,
-                VCFConstants.GENOTYPE_KEY,
-                VCFConstants.GENOTYPE_QUALITY_KEY,
-                VCFConstants.DEPTH_KEY,
-                VCFConstants.GENOTYPE_ALLELE_DEPTHS,
-                VCFConstants.GENOTYPE_PL_KEY);
-
-        // cancer-specific
-        // TODO: push to VCFConstants in GATK
-        headerInfo.add(new VCFFormatHeaderLine("FA", VCFHeaderLineCount.A, VCFHeaderLineType.Float, "Allele fraction of the alternate allele with regard to reference"));
-        headerInfo.add(new VCFFormatHeaderLine("SS", 1, VCFHeaderLineType.Integer, "Variant status relative to non-adjacent Normal,0=wildtype,1=germline,2=somatic,3=LOH,4=post-transcriptional modification,5=unknown"));
-        headerInfo.add(new VCFFormatHeaderLine(VCFConstants.RMS_BASE_QUALITY_KEY, VCFHeaderLineCount.A, VCFHeaderLineType.Float, "Average base quality for reads supporting alleles"));
-
-        return headerInfo;
-    }
-
-    private VariantContext generateVC(CandidateMutation m) {
-        GenomeLoc l = m.getLocation();
-        List<Allele> alleles = Arrays.asList(Allele.create((byte) m.getRefAllele(), true), Allele.create((byte) m.getAltAllele()));
-        List<Allele> tumorAlleles = Arrays.asList(Allele.create((byte) m.getRefAllele(), true), Allele.create((byte) m.getAltAllele()));
-        List<Allele> normalAlleles = Arrays.asList(Allele.create((byte) m.getRefAllele(), true));
-
-        GenotypeBuilder tumorGenotype =
-                new GenotypeBuilder(m.getTumorSampleName(), tumorAlleles)
-                        .AD(new int[]{m.getInitialTumorRefCounts(), m.getInitialTumorAltCounts()})
-                        .attribute("FA", m.getTumorF())
-                        .DP(m.getInitialTumorReadDepth());
-
-        if (m.getInitialTumorAltCounts() > 0) {
-            tumorGenotype.attribute(VCFConstants.RMS_BASE_QUALITY_KEY,  m.getInitialTumorAltQualitySum() / m.getInitialTumorAltCounts()); // TODO: is this TCGA compliant?
-        }
-
-        GenotypeBuilder normalGenotype =
-                new GenotypeBuilder(m.getNormalSampleName(), normalAlleles)
-                        .AD(new int[]{m.getInitialNormalRefCounts(), m.getInitialNormalAltCounts()})
-                        .attribute("FA", m.getNormalF())
-                        .DP(m.getInitialNormalReadDepth())
-                        .attribute(VCFConstants.RMS_BASE_QUALITY_KEY, "." );    // TODO: is this TCGA-compliant?
-
-        VariantContextBuilder vc =
-                new VariantContextBuilder("", l.getContig(), l.getStart(), l.getStop(), alleles);
-
-        vc.filter(m.isRejected()?"REJECT":"PASS");
-        if(m.getDbsnpVC() != null) {
-            vc.id(m.getDbsnpVC().getID());
-            vc.attribute(VCFConstants.DBSNP_KEY, null);
-        }
-        if (!m.isRejected()) {
-            vc.attribute(VCFConstants.SOMATIC_KEY, null);
-            vc.attribute("VT", "SNP");
-            tumorGenotype.attribute("SS", 2); // TODO: extract these TCGA specific attributes to a class
-            normalGenotype.attribute("SS", 0); // TODO: extract these TCGA specific attributes to a class
-        }
-
-        // add the genotype objects
-        vc.genotypes(tumorGenotype.make(), normalGenotype.make());
-
-        return vc.make();
-    }
 
 }
