@@ -5,56 +5,35 @@ import org.apache.commons.math.distribution.BinomialDistribution;
 import org.apache.commons.math.distribution.BinomialDistributionImpl;
 
 public class NormalPowerCalculator extends AbstractPowerCalculator {
-
-    private static double Q30_EPS = Math.pow(10, (-30/10)) / 3d;
-    private static double LOD = 2.3d;
-
-    public static void main(String[] argv) throws MathException {
-        double wiggle = 0.000001;
-
-        test(testCalculatePower(50, Q30_EPS, LOD), 1.0000000, wiggle, "Failed!");
-        test(testCalculatePower(10, Q30_EPS, LOD), 0.9973492, wiggle, "Failed!");
-        test(testCalculatePower( 8, Q30_EPS, LOD), 0.9974184, wiggle, "Failed!");
-        test(testCalculatePower( 5, Q30_EPS, LOD), 0.0000000, wiggle, "Failed!");
-        test(testCalculatePower(10, Math.pow(10, (-20/10)) / 3d, LOD), 0.9762534, wiggle, "Failed!");
-
-
-        // make an instance to test caching
-        NormalPowerCalculator pc = new NormalPowerCalculator(Q30_EPS, LOD);
-        test(pc.cachingPowerCalculation(10), 0.9973492, wiggle, "Failed!");
-        test(pc.cachingPowerCalculation(10), 0.9973492, wiggle, "Failed!");
-        test(pc.cachingPowerCalculation(10), 0.9973492, wiggle, "Failed!");
-
-    }
-
-    private static double testCalculatePower(int n, double eps, double threshold) throws MathException {
-        double power = calculatePower(n, eps, threshold);
-        System.out.println("Depth: " + n + " EPS: " + eps + " Threshols: " + threshold + " --> Power: " + power);
-        return power;
-    }
+    private boolean constantEnableSmoothing;
 
     public NormalPowerCalculator(double constantEps, double constantLodThreshold) {
         this.constantEps = constantEps;
         this.constantLodThreshold = constantLodThreshold;
+        this.constantEnableSmoothing = true;
     }
 
-
+    public NormalPowerCalculator(double constantEps, double constantLodThreshold, boolean enableSmoothing) {
+        this.constantEps = constantEps;
+        this.constantLodThreshold = constantLodThreshold;
+        this.constantEnableSmoothing = enableSmoothing;
+    }
 
     public double cachingPowerCalculation(int n) throws MathException {
         PowerCacheKey key = new PowerCacheKey(n, 0.5);
         Double power = cache.get(key);
         if (power == null) {
-            power = calculatePower(n, constantEps, constantLodThreshold);
+            power = calculatePower(n, constantEps, constantLodThreshold, constantEnableSmoothing);
             cache.put(key, power);
         }
         return power;
     }
 
-    private static double calculateNormalLod(int depth, int alts, double eps) {
+    protected static double calculateNormalLod(int depth, int alts, double eps) {
         return (calculateLogLikelihood(depth, alts, eps, 0) - calculateLogLikelihood(depth, alts, eps, 0.5));
     }
 
-    private static double calculatePower(int depth, double eps, double lodThreshold) throws MathException {
+    protected static double calculatePower(int depth, double eps, double lodThreshold, boolean enableSmoothing) throws MathException {
         if (depth==0) return 0;
 
         // calculate the probability of each configuration
@@ -91,7 +70,7 @@ public class NormalPowerCalculator extends AbstractPowerCalculator {
         // the k and k-1 bin, so we prorate the power from that bin
         // the k and k-1 bin, so we prorate the power from that bin
         // if k==0, it must be that lodThreshold == lod[k] so we don't have to make this correction
-        if ( k > 0 ) {
+        if ( enableSmoothing && k > 0 ) {
             double x = 1d - (lodThreshold - lod[k-1]) / (lod[k] - lod[k-1]);
             power = x*p[k-1];
         }

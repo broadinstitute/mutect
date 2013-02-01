@@ -14,14 +14,13 @@ import java.io.PrintStream;
  * To change this template use File | Settings | File Templates.
  */
 public class MuTectArgumentCollection {
+    @Hidden
     @Argument(fullName = "noop", required = false, doc="used for debugging, basically exit as soon as we get the reads")
     public boolean NOOP = false;
 
-    @Hidden
     @Argument(fullName = "enable_extended_output", required = false, doc="add many additional columns of statistics to the output file")
     public boolean ENABLE_EXTENDED_OUTPUT = false;
 
-    @Hidden
     @Argument(fullName = "artifact_detection_mode", required = false, doc="used when running the caller on a normal (as if it were a tumor) to detect artifacts")
     public boolean ARTIFACT_DETECTION_MODE = false;
 
@@ -120,24 +119,7 @@ public class MuTectArgumentCollection {
     @Argument(fullName="power_constant_qscore", doc="Phred scale quality score constant to use in power calculations", required=false)
     public int POWER_CONSTANT_QSCORE = 30;
 
-    @Argument(fullName="absolute_copy_number_data", doc="Absolute Copy Number Data, as defined by Absolute, to use in power calculations", required=false)
-    public File ABSOLUTE_COPY_NUMBER_DATA = null;
-
     @Argument(fullName="power_constant_af", doc="Allelic fraction constant to use in power calculations", required=false)
     public double POWER_CONSTANT_AF = 0.3f;
-
-    public enum SequencingErrorModel {
-        solid(5),
-        illumina(1);
-
-        private int priorBaseOffset;
-        private SequencingErrorModel(int priorBaseOffset) {
-            this.priorBaseOffset = priorBaseOffset;
-        }
-
-        public int getPriorBaseOffset() {
-            return priorBaseOffset;
-        }
-    }
 
 }

@@ -20,8 +20,6 @@ public class VariableAllelicRatioGenotypeLikelihoods extends DiploidSNPGenotypeL
      * @param f non-reference allele fraction estimate
      */
     public VariableAllelicRatioGenotypeLikelihoods(char ref, double f) {
-//        super(new DiploidSNPGenotypePriors(), DiploidSNPGenotypeLikelihoods.DEFAULT_PCR_ERROR_RATE);
-        // TODO: re-enable the non-zero PCR Error rate once we understand the effect of it
         super(0);
         this.ref = ref;
 
@@ -101,7 +99,6 @@ public class VariableAllelicRatioGenotypeLikelihoods extends DiploidSNPGenotypeL
             double likelihood = likelihoods[g.ordinal()];
 
             log10Likelihoods[g.ordinal()] += likelihood;
-            //log10Posteriors[g.ordinal()] += likelihood;
         }
 
         return 1;
@@ -110,7 +107,7 @@ public class VariableAllelicRatioGenotypeLikelihoods extends DiploidSNPGenotypeL
 
     ////////////////////////////////////////////////////////////////////////////////////////
     //
-    // Need to disable caching for now since it's not built to handle variable allelic fractions
+    // Need to disable superclass caching since it's not built to handle variable allelic fractions
     //
     ////////////////////////////////////////////////////////////////////////////////////////
 

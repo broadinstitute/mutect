@@ -96,9 +96,6 @@ public class LocusReadPile {
             }
         }
 
-        // get the number of deletions
-//        this.deletionsCount = noOverlapPileup.getNumberOfDeletions();
-        
     }
 
     public static ReadBackedPileup getOverlappingFragmentFilteredPileupButPreferMismatches(ReadBackedPileup rbp, byte ref) {
@@ -107,16 +104,6 @@ public class LocusReadPile {
 
     public static ReadBackedPileup getOverlappingFragmentFilteredPileup(ReadBackedPileup rbp, byte ref) {
         return getOverlappingFragmentFilteredPileup(rbp, ref, false);
-    }
-
-    private static class ElementInfo {
-        public PileupElement p;
-        public Integer index;
-
-        private ElementInfo(PileupElement p, Integer index) {
-            this.p = p;
-            this.index = index;
-        }
     }
 
     public static ReadBackedPileup getOverlappingFragmentFilteredPileup(ReadBackedPileup rbp, byte ref, boolean retainMismatches) {
@@ -167,16 +154,10 @@ public class LocusReadPile {
         List<PileupElement> sortedList = new ArrayList<PileupElement>(rbp.getNumberOfElements());
         for(int j=0; j<elementsToKeep.length; j++) {
             Boolean b = elementsToKeep[j];
-            if (b != null && b == true) { sortedList.add(listOfElements[j]); }
+            if (b != null && b ) { sortedList.add(listOfElements[j]); }
         }
 
         return new ReadBackedPileupImpl(rbp.getLocation(), sortedList);
-    }
-
-    private static class PileupElementAlignmentStartPositionComparator implements Comparator<PileupElement>{
-        public int compare(PileupElement pe1, PileupElement pe2) {
-            if (pe1.getRead().getAlignmentStart() < pe2.getRead().getAlignmentStart()) { return -1; } else { return 1; }
-        }
     }
 
     public double estimateAlleleFraction(char ref, char alt) {
@@ -191,71 +172,30 @@ public class LocusReadPile {
         return (depth==0)?0:(altCount / depth);
     }
 
-    public static double estimateAlleleFractionUsingQuals(ReadBackedPileup pileup, byte ref, byte alt) {
-        // in this case, the true allele fraction is modulated by the base qualities in a two base model
-        // since the other two bases could go to either ref or alt they will cancel out
-         
-
-        // helps in cases where the alts are very low quality and the refs are high quality
-        double refOrAltCount = 0;
-        double altCount = 0;
-        for(PileupElement pe : pileup) {
-            // TODO: cache this...
-        
-            double e = Math.pow(10, -1 * pe.getQual()/10);
-
-            // each REF could really be an ALT with a probability of e/3 and
-            if (pe.getBase() == ref) { 
-                altCount += e/3;
-                refOrAltCount++;
-
-            // each ALT could really a different base with a probability of e.
-            } else if (pe.getBase() == alt) {
-                altCount += (1 - e);
-                refOrAltCount++;
-            }
-        }
-
-        return (refOrAltCount==0)?0:(altCount / refOrAltCount);
-    }
-
     public double calculateLogLikelihood(byte alt, double f) {
         return LocusReadPile.calculateLogLikelihood(this.finalPileup, ((byte) this.refBase), alt, f);
     }
 
-    public double calculateAltVsRefLOD(byte alt, double fAlternate, double fReference) {
-        return calculateAltVsRefLOD(alt, fAlternate, fReference, null);
-    }
-
-    public double calculateAltVsRefLOD(ReadBackedPileup pileup, byte alt, double fAlternate, double fReference, RecalibratedLocalQualityScores lqs) {
-        double lodAlt = LocusReadPile.calculateLogLikelihood(pileup, ((byte) this.refBase), alt, fAlternate, lqs);
-        double lodRef = LocusReadPile.calculateLogLikelihood(pileup, ((byte) this.refBase), alt, fReference, lqs);
+    public double calculateAltVsRefLOD(ReadBackedPileup pileup, byte alt, double fAlternate, double fReference) {
+        double lodAlt = LocusReadPile.calculateLogLikelihood(pileup, ((byte) this.refBase), alt, fAlternate);
+        double lodRef = LocusReadPile.calculateLogLikelihood(pileup, ((byte) this.refBase), alt, fReference);
         return lodAlt - lodRef;
     }
 
-    public double calculateAltVsRefLOD(byte alt, double fAlternate, double fReference, RecalibratedLocalQualityScores lqs) {
-        return calculateAltVsRefLOD(this.finalPileup, alt, fAlternate, fReference, lqs);
+    public double calculateAltVsRefLOD(byte alt, double fAlternate, double fReference) {
+        return calculateAltVsRefLOD(this.finalPileup, alt, fAlternate, fReference);
     }
-
-
 
     public double calculateRefVsAltLOD(ReadBackedPileup pileup, byte alt, double fAlternate, double fReference) {
-        return calculateRefVsAltLOD(pileup, alt, fAlternate, fReference, null);
+        return -1*calculateAltVsRefLOD(pileup, alt, fAlternate, fReference);
     }
 
-    public double calculateRefVsAltLOD(ReadBackedPileup pileup, byte alt, double fAlternate, double fReference, RecalibratedLocalQualityScores lqs) {
-        return -1*calculateAltVsRefLOD(pileup, alt, fAlternate, fReference, lqs);
-    }
-
-    static public double calculateLogLikelihood(ReadBackedPileup pileup, byte ref, byte alt, double f, RecalibratedLocalQualityScores lqs) {
+    static public double calculateLogLikelihood(ReadBackedPileup pileup, byte ref, byte alt, double f) {
 
         double ll = 0;
         for(PileupElement pe : pileup) {
             byte base = pe.getBase();
             byte qual = pe.getQual();
-            if (lqs != null) {
-                qual = lqs.getQual(pe);
-            }
             double e = pow(10, (qual / -10.0));
 
             if (base == ref) {
@@ -270,18 +210,14 @@ public class LocusReadPile {
         return ll;
     }
 
-    static public double calculateLogLikelihood(ReadBackedPileup pileup, byte ref, byte alt, double f) {
-        return calculateLogLikelihood(pileup, ref, alt, f, null);
-    }
-
     public VariableAllelicRatioGenotypeLikelihoods calculateLikelihoods(ReadBackedPileup pileup) {
         return calculateLikelihoods(0.5f, pileup);
     }
 
     public VariableAllelicRatioGenotypeLikelihoods calculateLikelihoods(double alpha, ReadBackedPileup pileup) {
+        // TODO: see if we can move to use "likelihoods.add(pileup, true, true, this.minQualityScore)"
         VariableAllelicRatioGenotypeLikelihoods likelihoods
                 = new VariableAllelicRatioGenotypeLikelihoods(refBase, alpha);
-//TODO: move to this        likelihoods.add(pileup, true, true, this.minQualityScore);
 
         // we have to do this rather than pass in the ReadBackedPileup because that call
         // attempts to make Fragments out of these, which doesn't work if you have
@@ -294,61 +230,6 @@ public class LocusReadPile {
 
     public int getFilteredBaseCount(int minBaseQualityScore) {
         return this.finalPileup.getBaseFilteredPileup(minBaseQualityScore).depthOfCoverage();
-    }
-
-    public List<Byte> getLocusBases(int locusOffset) {
-        List<Byte> bases = new ArrayList<Byte>(finalPileupReads.size());
-
-        for(int i=0; i< finalPileupReads.size(); i++) {
-            SAMRecord read = finalPileupReads.get(i);
-            int readOffset = finalPileupOffsets.get(i);
-
-            int offset = readOffset + locusOffset;
-            if (offset >= 0 && offset < read.getReadString().length()) {
-                byte base = read.getReadBases()[offset];
-                if (base != (byte) 'N') {
-                    bases.add(read.getReadBases()[offset]);
-                }
-            }
-        }
-        return bases;
-    }
-    public List<Byte> getQualityScores(int locusOffset, char allele) {
-        List<Byte> scores = new ArrayList<Byte>();
-
-        for(int i=0; i<finalPileupReads.size(); i++) {
-            SAMRecord read = finalPileupReads.get(i);
-            int readOffset = finalPileupOffsets.get(i);
-
-            int offset = readOffset + locusOffset;
-            if (offset >= 0 && offset < read.getReadString().length()) {
-                char base = read.getReadString().charAt(offset);
-                byte qual = read.getBaseQualities()[offset];
-
-                if (base == allele) { scores.add(qual); }
-            }
-        }
-        return scores;        
-    }
-
-    public List<Integer> getPositionsInRead(char allele) {
-        return getPositionsInRead(0, allele);
-    }
-
-    public List<Integer> getPositionsInRead(int locusOffset, char allele) {
-        List<Integer> positions = new ArrayList<Integer>();
-
-        for(int i=0; i<finalPileupReads.size(); i++) {
-            SAMRecord read = finalPileupReads.get(i);
-            int readOffset = finalPileupOffsets.get(i);
-
-            int offset = readOffset + locusOffset;
-            if (offset >= 0 && offset < read.getReadString().length()) {
-                char base = read.getReadString().charAt(offset);
-                if (base == allele) { positions.add(offset); }
-            }
-        }
-        return positions;
     }
 
     public DiploidGenotype getBestGenotype(VariableAllelicRatioGenotypeLikelihoods likelihoods) {
@@ -365,35 +246,10 @@ public class LocusReadPile {
         return best;
     }
 
-    public static double getRefVsNextBest(VariableAllelicRatioGenotypeLikelihoods likelihoods, char ref) {
-        Double refLikelihood = null;
-        Double nextBest = null;
-
-        for(DiploidGenotype gt : DiploidGenotype.values()) {
-            double likelihood = likelihoods.getLikelihood(gt);
-
-            // the reference theory (ref/ref)
-            if ( gt.base1 == ref && gt.base2 == ref) {
-                refLikelihood = likelihood;
-            } else {
-                if (nextBest == null || likelihood >= nextBest) {
-                    nextBest = likelihood; 
-                }
-            }
-
-        }
-
-        return refLikelihood - nextBest;
-    }
 
     public double getHetVsRef(VariableAllelicRatioGenotypeLikelihoods likelihoods, char ref, char altAllele) {
         double[] refHetHom = extractRefHetHom(likelihoods, ref, altAllele);
         return refHetHom[1] - refHetHom[0];
-    }
-
-    public double getRefVsHet(VariableAllelicRatioGenotypeLikelihoods likelihoods, char ref, char altAllele) {
-        double[] refHetHom = extractRefHetHom(likelihoods, ref, altAllele);
-        return refHetHom[0] - refHetHom[1];
     }
 
     public double getAltVsRef(VariableAllelicRatioGenotypeLikelihoods likelihoods, char ref, char altAllele) {
@@ -412,37 +268,6 @@ public class LocusReadPile {
 
 
     // ------------------------------------------------------------
-
-    /**
-     * Extract the LOD comparing ref:ref to ref:alt and alt:alt
-     */
-    private double[] extractRefAlt(VariableAllelicRatioGenotypeLikelihoods gl, char ref, char altAllele) {
-        double refRef = 0;
-        double altRef = 0;
-        double altAlt = 0;
-
-        // FIXME: potential underflow problem!        
-        for(DiploidGenotype gt : DiploidGenotype.values()) {
-            double likelihood = gl.getLikelihood(gt);
-
-            // the ref:mutant theory
-            if ( (gt.base1 == ref && gt.base2 == altAllele) ||
-                 (gt.base1 == altAllele && gt.base2 == ref) ) {
-                altRef += Math.pow(10, likelihood);
-            }
-
-            if ( gt.base1 == altAllele && gt.base2 == altAllele) {
-                altAlt += Math.pow(10, likelihood);
-            }
-
-            if ( gt.base1 == ref && gt.base2 == ref) {
-                refRef = likelihood;
-            }
-
-        }
-        return new double[]{refRef, altRef, altAlt};
-    }
-
     protected static double[] extractRefHetHom(VariableAllelicRatioGenotypeLikelihoods gl, char refAllele, char altAllele) {
         double ref = 0;
         double het = 0;

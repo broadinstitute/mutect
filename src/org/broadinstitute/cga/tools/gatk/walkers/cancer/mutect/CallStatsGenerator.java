@@ -5,7 +5,6 @@ import net.sf.samtools.util.StringUtil;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
  *  Encapsulates the generation of a CallStats line based on the information in the Candidate
@@ -18,31 +17,27 @@ public class CallStatsGenerator {
 
     private static final String[] COMPLETE_CALL_STATS_HEADER =
             new String[]{
-                "contig","position","context","ref_allele","alt_allele","tumor_name","normal_name","score","dbsnp_site",
-                "covered", "power", "tumor_power", "normal_power", "normal_power_nsp", "normal_power_wsp",
-                "total_pairs","improper_pairs","map_Q0_reads",
-                "init_t_lod","t_lod_fstar","t_lod_lqs", "t_lod_fstar_forward", "t_lod_fstar_reverse", "tumor_f", "tumor_f_lb", "contaminant_fraction","contaminant_lod","t_q20_count", "t_ref_count","t_alt_count","t_ref_sum","t_alt_sum","t_ref_max_mapq","t_alt_max_mapq","t_ins_count","t_del_count",
-                "normal_best_gt","init_n_lod","n_lod_fstar","normal_f", "normal_f_quals",
-                "normal_artifact_lod_tf", "normal_artifact_lod_low_tf", "normal_artifact_lod_nf", "normal_artifact_lod_nfq",
-                "n_q20_count", "n_ref_count","n_alt_count","n_ref_sum","n_alt_sum",
-                "power_to_detect_positive_strand_artifact", "power_to_detect_negative_strand_artifact",
-                "strand_bias_counts",
-                "tumor_alt_fpir_median", "tumor_alt_fpir_mad","tumor_alt_rpir_median","tumor_alt_rpir_mad","alt_fpir","alt_rpir",
-                "powered_filters",
-                "normal_artifact_power_tf", "normal_artifact_power_low_tf", "normal_artifact_power_nf",
-                "normal_global_qll", "normal_local_qll", "normal_qmodel_lod",
-                "observed_in_normals_count", "failure_reasons","judgement"
+                    "contig","position","context","ref_allele","alt_allele","tumor_name","normal_name","score","dbsnp_site",
+                    "covered", "power", "tumor_power", "normal_power", "normal_power_nsp", "normal_power_wsp",
+                    "total_pairs","improper_pairs","map_Q0_reads",
+                    "init_t_lod","t_lod_fstar", "t_lod_fstar_forward", "t_lod_fstar_reverse", "tumor_f", "contaminant_fraction","contaminant_lod","t_q20_count", "t_ref_count","t_alt_count","t_ref_sum","t_alt_sum","t_ref_max_mapq","t_alt_max_mapq","t_ins_count","t_del_count",
+                    "normal_best_gt","init_n_lod","normal_f",
+                    "n_q20_count", "n_ref_count","n_alt_count","n_ref_sum","n_alt_sum",
+                    "power_to_detect_positive_strand_artifact", "power_to_detect_negative_strand_artifact",
+                    "strand_bias_counts",
+                    "tumor_alt_fpir_median", "tumor_alt_fpir_mad","tumor_alt_rpir_median","tumor_alt_rpir_mad",
+                    "observed_in_normals_count", "failure_reasons","judgement"
             };
 
     private static final String[] MINIMAL_CALL_STATS_HEADER =
             new String[]{
-                "contig","position","context","ref_allele","alt_allele","tumor_name","normal_name","score","dbsnp_site",
-                "covered", "power", "tumor_power", "normal_power",
-                "total_pairs","improper_pairs","map_Q0_reads",
-                "t_lod_fstar","tumor_f","contaminant_fraction","contaminant_lod",
-                "t_ref_count","t_alt_count","t_ref_sum","t_alt_sum","t_ref_max_mapq","t_alt_max_mapq","t_ins_count","t_del_count",
-                "normal_best_gt","init_n_lod", "n_ref_count","n_alt_count","n_ref_sum","n_alt_sum",
-                "judgement"
+                    "contig","position","context","ref_allele","alt_allele","tumor_name","normal_name","score","dbsnp_site",
+                    "covered", "power", "tumor_power", "normal_power",
+                    "total_pairs","improper_pairs","map_Q0_reads",
+                    "t_lod_fstar","tumor_f","contaminant_fraction","contaminant_lod",
+                    "t_ref_count","t_alt_count","t_ref_sum","t_alt_sum","t_ref_max_mapq","t_alt_max_mapq","t_ins_count","t_del_count",
+                    "normal_best_gt","init_n_lod", "n_ref_count","n_alt_count","n_ref_sum","n_alt_sum",
+                    "observed_in_normals_count", "failure_reasons","judgement"
             };
 
     private boolean enableExtendedOutput;
@@ -91,7 +86,7 @@ public class CallStatsGenerator {
             siteInfo = "DBSNP+COSMIC";
         }
 
-         StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         int[] ci = candidate.getStrandContingencyTable();
         sb.append("(");
         sb.append(ci[0]).append(",");
@@ -101,76 +96,59 @@ public class CallStatsGenerator {
         String strandInfo = sb.toString();
 
         String[] msg = new String[] {
-                        candidate.getLocation().getContig(),
-                        format(candidate.getLocation().getStart()),
-                        candidate.getSequenceContext(),
-                        ""+candidate.getRefAllele(),
-                        ""+candidate.getAltAllele(),
-                        candidate.getTumorSampleName(),
-                        candidate.getNormalSampleName(),
-                        format(candidate.getScore()),
-                        siteInfo,
-                        (candidate.isCovered()?"COVERED":"UNCOVERED"),
-                        format(candidate.getPower()),
-                        format(candidate.getTumorPower()),
-                        format(candidate.getNormalPower()),
-                        format(candidate.getNormalPowerNoSNPPrior()),
-                        format(candidate.getNormalPowerWithSNPPrior()),
-                        format(candidate.getTotalPairs()),
-                        format(candidate.getImproperPairs()),
-                        format(candidate.getMapQ0Reads()),
-                        format(candidate.getInitialTumorLod()),
-                        format(candidate.getTumorLodFStar()),
-                        format(candidate.getTumorLodLQS()),
-                        format(candidate.getTumorLodFStarForward()),
-                        format(candidate.getTumorLodFStarReverse()),
-                        format(candidate.getTumorF()),
-                        format(candidate.getTumorFLowerBound()),
-                        format(candidate.getContaminationFraction()),
-                        format(candidate.getContaminantLod()),
-                        format(candidate.getTumorQ20Count()),
-                        format(candidate.getInitialTumorRefCounts()),
-                        format(candidate.getInitialTumorAltCounts()),
-                        format(candidate.getInitialTumorRefQualitySum()),
-                        format(candidate.getInitialTumorAltQualitySum()),
-                        format(candidate.getTumorRefMaxMapQ()),
-                        format(candidate.getTumorAltMaxMapQ()),
-                        format(candidate.getTumorInsertionCount()),
-                        format(candidate.getTumorDeletionCount()),
-                        format(candidate.getInitialNormalBestGenotype().toString()),
-                        format(candidate.getInitialNormalLod()),
-                        format(candidate.getNormalLodFStar()),
-                        format(candidate.getNormalF()),
-                        format(candidate.getNormalFQuals()),
-                        format(candidate.getNormalArtifactLodTF()),
-                        format(candidate.getNormalArtifactLodLowTF()),
-                        format(candidate.getNormalArtifactLodNF()),
-                        format(candidate.getNormalArtifactLodNFQ()),
-                        format(candidate.getNormalQ20Count()),
-                        format(candidate.getInitialNormalRefCounts()),
-                        format(candidate.getInitialNormalAltCounts()),
-                        format(candidate.getInitialNormalRefQualitySum()),
-                        format(candidate.getInitialNormalAltQualitySum()),
-                        format(candidate.getPowerToDetectPositiveStrandArtifact()),
-                        format(candidate.getPowerToDetectNegativeStrandArtifact()),
-                        format(strandInfo),
-                        candidate.getTumorForwardOffsetsInReadMedian()==null?"n/a":format(candidate.getTumorForwardOffsetsInReadMedian()),
-                        candidate.getTumorForwardOffsetsInReadMad()==null?"n/a":format(candidate.getTumorForwardOffsetsInReadMad()),
-                        candidate.getTumorReverseOffsetsInReadMedian()==null?"n/a":format(candidate.getTumorReverseOffsetsInReadMedian()),
-                        candidate.getTumorReverseOffsetsInReadMad()==null?"n/a":format(candidate.getTumorReverseOffsetsInReadMad()),
-                        (candidate.getTumorAltForwardOffsetsInRead().size() > 500 ? "too_many": StringUtil.join(",", listToString(candidate.getTumorAltForwardOffsetsInRead()))),
-                        (candidate.getTumorAltReverseOffsetsInRead().size() > 500 ? "too_many":StringUtil.join(",", listToString(candidate.getTumorAltReverseOffsetsInRead()))),
-                        StringUtil.join(",", candidate.getPoweredFilters().toArray(new String[]{})),
-                        format(candidate.getNormalArtifactPowerTF()),
-                        format(candidate.getNormalArtifactPowerLowTF()),
-                        format(candidate.getNormalArtifactPowerNF()),
-                        format(candidate.getNormalGlobalQualityReferenceLL()),
-                        format(candidate.getNormalLocalQualityReferenceLL()),
-                        format(candidate.getNormalQualityModelLod()),
-                        format(candidate.getCountOfNormalsObservedIn()),
-                        StringUtil.join(",", candidate.getRejectionReasons().toArray(new String[]{})),
-                        keepString
-            };
+                candidate.getLocation().getContig(),
+                format(candidate.getLocation().getStart()),
+                candidate.getSequenceContext(),
+                ""+candidate.getRefAllele(),
+                ""+candidate.getAltAllele(),
+                candidate.getTumorSampleName(),
+                candidate.getNormalSampleName(),
+                format(candidate.getScore()),
+                siteInfo,
+                (candidate.isCovered()?"COVERED":"UNCOVERED"),
+                format(candidate.getPower()),
+                format(candidate.getTumorPower()),
+                format(candidate.getNormalPower()),
+                format(candidate.getNormalPowerNoSNPPrior()),
+                format(candidate.getNormalPowerWithSNPPrior()),
+                format(candidate.getTotalPairs()),
+                format(candidate.getImproperPairs()),
+                format(candidate.getMapQ0Reads()),
+                format(candidate.getInitialTumorLod()),
+                format(candidate.getTumorLodFStar()),
+                format(candidate.getTumorLodFStarForward()),
+                format(candidate.getTumorLodFStarReverse()),
+                format(candidate.getTumorF()),
+                format(candidate.getContaminationFraction()),
+                format(candidate.getContaminantLod()),
+                format(candidate.getTumorQ20Count()),
+                format(candidate.getInitialTumorRefCounts()),
+                format(candidate.getInitialTumorAltCounts()),
+                format(candidate.getInitialTumorRefQualitySum()),
+                format(candidate.getInitialTumorAltQualitySum()),
+                format(candidate.getTumorRefMaxMapQ()),
+                format(candidate.getTumorAltMaxMapQ()),
+                format(candidate.getTumorInsertionCount()),
+                format(candidate.getTumorDeletionCount()),
+                format(candidate.getInitialNormalBestGenotype().toString()),
+                format(candidate.getInitialNormalLod()),
+                format(candidate.getNormalF()),
+                format(candidate.getNormalQ20Count()),
+                format(candidate.getInitialNormalRefCounts()),
+                format(candidate.getInitialNormalAltCounts()),
+                format(candidate.getInitialNormalRefQualitySum()),
+                format(candidate.getInitialNormalAltQualitySum()),
+                format(candidate.getPowerToDetectPositiveStrandArtifact()),
+                format(candidate.getPowerToDetectNegativeStrandArtifact()),
+                format(strandInfo),
+                candidate.getTumorForwardOffsetsInReadMedian()==null?"n/a":format(candidate.getTumorForwardOffsetsInReadMedian()),
+                candidate.getTumorForwardOffsetsInReadMad()==null?"n/a":format(candidate.getTumorForwardOffsetsInReadMad()),
+                candidate.getTumorReverseOffsetsInReadMedian()==null?"n/a":format(candidate.getTumorReverseOffsetsInReadMedian()),
+                candidate.getTumorReverseOffsetsInReadMad()==null?"n/a":format(candidate.getTumorReverseOffsetsInReadMad()),
+                format(candidate.getCountOfNormalsObservedIn()),
+                StringUtil.join(",", candidate.getRejectionReasons().toArray(new String[candidate.getRejectionReasons().size()])),
+                keepString
+        };
 
         if (this.enableExtendedOutput) {
             for(int i=0; i<msg.length; i++) {
@@ -188,20 +166,10 @@ public class CallStatsGenerator {
 
     private String format(String s) { return s; }
     private String format(Integer i) { return fmt.format(i); }
-    private String format(Float f) { return format((double)f);}
     private String format(Double d) {
         if (d == null) { return "n/a"; }
 
         String s = fmt.format(d);
         return ("-0".equals(s))?"0":s;
     }
-
-    private String[] listToString(List<Integer> ints) {
-        String[] out = new String[ints.size()];
-        for(int i=0; i<ints.size(); i++) {
-            out[i] = ints.get(i).toString();
-        }
-        return out;
-    }
-
 }

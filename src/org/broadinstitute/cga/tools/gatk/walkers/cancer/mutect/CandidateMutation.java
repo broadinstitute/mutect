@@ -7,7 +7,6 @@ import org.broadinstitute.sting.gatk.walkers.genotyper.DiploidGenotype;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 
 public class CandidateMutation {
     private GenomeLoc location;
@@ -56,44 +55,19 @@ public class CandidateMutation {
     private DiploidGenotype initialNormalBestGenotype;
 
     private double initialTumorLod;
-    private double tumorLodLQS;
     private double initialNormalLod;
 
     private double tumorF;
-    private double tumorFLowerBound;
     private double tumorLodFStar;
     private double tumorLodFStarForward;
     private double tumorLodFStarReverse;
 
     private double normalF;
-    private double normalFQuals;
-
-    private double normalLodFStar;
-
-    private double normalArtifactPowerTF;
-    private double normalArtifactLodTF;
-
-    private double normalArtifactPowerLowTF;
-    private double normalArtifactLodLowTF;
-
-    private double normalArtifactPowerNF;
-    private double normalArtifactLodNF;
-
-    private double normalArtifactLodNFQ;
-
-    private double normalGlobalQualityReferenceLL;
-    private double normalLocalQualityReferenceLL;
-    private double normalQualityModelLod;
-
-    private RankSumTest.Result tumorQualityRankSumTest;
-    private RankSumTest.Result tumorReadPositionRankSumTest;
 
     private double powerToDetectPositiveStrandArtifact;
     private double powerToDetectNegativeStrandArtifact;
 
     private int[] strandContingencyTable;
-
-    private FisherExact.FisherData clippingBias;
 
     private List<Integer> tumorAltForwardOffsetsInRead;
     private List<Integer> tumorAltReverseOffsetsInRead;
@@ -105,8 +79,6 @@ public class CandidateMutation {
 
     private int tumorInsertionCount;
     private int tumorDeletionCount;
-
-    private List<String> poweredFilters = new ArrayList<String>();
 
     private List<String> rejectionReasons = new ArrayList<String>();
     private boolean rejected = false; // summary judgement... keep or reject the site
@@ -123,6 +95,38 @@ public class CandidateMutation {
     public boolean isGermlineAtRisk() {
         return (dbsnpSite && !cosmicSite);
     }
+
+    public int getCountOfNormalsObservedIn() {
+        if (panelOfNormalsVC == null) { return 0; }
+
+        // it's either an integer, or a collection of integers
+        int count = 0;
+        Object o = panelOfNormalsVC.getAttribute("AC");
+        if (o == null) { return 0; }
+        if (o instanceof String) { return Integer.parseInt((String) o); }
+        if (o instanceof Collection) {
+            for(String s : ((Collection<String>) o)) {
+                count += Integer.parseInt(s);
+            }
+            return count;
+        }
+        throw new RuntimeException("Unexpected value processing panel of normals allele count: " + o);
+    }
+
+    public void setRejectionReasons(List<String> rejectionReasons) {
+        if (rejectionReasons != null && rejectionReasons.size() > 0) {
+            setRejected(true);
+        }
+        this.rejectionReasons = rejectionReasons;
+    }
+
+    public void addRejectionReason(String reason) {
+        setRejected(true);
+        getRejectionReasons().add(reason);
+    }
+
+
+
 
     // -------------------------------------------------------------------------
     // GENERATED CODE BELOW THIS POINT
@@ -241,28 +245,12 @@ public class CandidateMutation {
         this.tumorF = tumorF;
     }
 
-    public double getTumorFLowerBound() {
-        return tumorFLowerBound;
-    }
-
-    public void setTumorFLowerBound(double tumorFLowerBound) {
-        this.tumorFLowerBound = tumorFLowerBound;
-    }
-
     public double getNormalF() {
         return normalF;
     }
 
     public void setNormalF(double normalF) {
         this.normalF = normalF;
-    }
-
-    public double getNormalLodFStar() {
-        return normalLodFStar;
-    }
-
-    public void setNormalLodFStar(double normalLodFStar) {
-        this.normalLodFStar = normalLodFStar;
     }
 
     public int getInitialTumorRefQualitySum() {
@@ -345,57 +333,8 @@ public class CandidateMutation {
         this.normalSampleName = normalSampleName;
     }
 
-    public RankSumTest.Result getTumorQualityRankSumTest() {
-        return tumorQualityRankSumTest;
-    }
-
-    public void setTumorQualityRankSumTest(RankSumTest.Result tumorQualityRankSumTest) {
-        this.tumorQualityRankSumTest = tumorQualityRankSumTest;
-    }
-
-    public RankSumTest.Result getTumorReadPositionRankSumTest() {
-        return tumorReadPositionRankSumTest;
-    }
-
-    public void setTumorReadPositionRankSumTest(RankSumTest.Result tumorReadPositionRankSumTest) {
-        this.tumorReadPositionRankSumTest = tumorReadPositionRankSumTest;
-    }
-
-    public FisherExact.FisherData getClippingBias() {
-        return clippingBias;
-    }
-
-    public void setClippingBias(FisherExact.FisherData clippingBias) {
-        this.clippingBias = clippingBias;
-    }
-
     public List<String> getRejectionReasons() {
         return rejectionReasons;
-    }
-
-    public void setRejectionReasons(List<String> rejectionReasons) {
-        if (rejectionReasons != null && rejectionReasons.size() > 0) {
-            setRejected(true);
-        }
-        this.rejectionReasons = rejectionReasons;
-    }
-
-    public void addRejectionReason(String reason) {
-        setRejected(true);
-        getRejectionReasons().add(reason);
-    }
-
-
-    public List<String> getPoweredFilters() {
-        return poweredFilters;
-    }
-
-    public void setPoweredFilters(List<String> poweredFilters) {
-        this.poweredFilters = poweredFilters;
-    }
-
-    public void addPoweredFilter(String filter) {
-        getPoweredFilters().add(filter);
     }
 
     public int getInitialTumorRefCounts() {
@@ -586,23 +525,6 @@ public class CandidateMutation {
         return (panelOfNormalsVC != null);
     }
 
-    public int getCountOfNormalsObservedIn() {
-        if (panelOfNormalsVC == null) { return 0; }
-
-        // it's either an integer, or a collection of integers
-        int count = 0;
-        Object o = panelOfNormalsVC.getAttribute("AC");
-        if (o == null) { return 0; }
-        if (o instanceof String) { return Integer.parseInt((String) o); }
-        if (o instanceof Collection) {
-            for(String s : ((Collection<String>) o)) {
-                count += Integer.parseInt(s);
-            }
-            return count;
-        }
-        throw new RuntimeException("Unexpected value processing panel of normals allele count: " + o);
-    }
-
     public VariantContext getPanelOfNormalsVC() {
         return panelOfNormalsVC;
     }
@@ -611,56 +533,8 @@ public class CandidateMutation {
         this.panelOfNormalsVC = panelOfNormalsVC;
     }
 
-    public double getNormalArtifactPowerTF() {
-        return normalArtifactPowerTF;
-    }
-
-    public void setNormalArtifactPowerTF(double normalArtifactPowerTF) {
-        this.normalArtifactPowerTF = normalArtifactPowerTF;
-    }
-
-    public double getNormalArtifactLodTF() {
-        return normalArtifactLodTF;
-    }
-
-    public void setNormalArtifactLodTF(double normalArtifactLodTF) {
-        this.normalArtifactLodTF = normalArtifactLodTF;
-    }
-
     public double getPowerToDetectPositiveStrandArtifact() {
         return powerToDetectPositiveStrandArtifact;
-    }
-
-    public double getNormalArtifactPowerLowTF() {
-        return normalArtifactPowerLowTF;
-    }
-
-    public void setNormalArtifactPowerLowTF(double normalArtifactPowerLowTF) {
-        this.normalArtifactPowerLowTF = normalArtifactPowerLowTF;
-    }
-
-    public double getNormalArtifactLodLowTF() {
-        return normalArtifactLodLowTF;
-    }
-
-    public void setNormalArtifactLodLowTF(double normalArtifactLodLowTF) {
-        this.normalArtifactLodLowTF = normalArtifactLodLowTF;
-    }
-
-    public double getNormalArtifactPowerNF() {
-        return normalArtifactPowerNF;
-    }
-
-    public void setNormalArtifactPowerNF(double normalArtifactPowerNF) {
-        this.normalArtifactPowerNF = normalArtifactPowerNF;
-    }
-
-    public double getNormalArtifactLodNF() {
-        return normalArtifactLodNF;
-    }
-
-    public void setNormalArtifactLodNF(double normalArtifactLodNF) {
-        this.normalArtifactLodNF = normalArtifactLodNF;
     }
 
     public void setPowerToDetectPositiveStrandArtifact(double powerToDetectPositiveStrandArtifact) {
@@ -689,54 +563,6 @@ public class CandidateMutation {
 
     public void setNormalPowerNoSNPPrior(double normalPowerNoSNPPrior) {
         this.normalPowerNoSNPPrior = normalPowerNoSNPPrior;
-    }
-
-    public double getNormalGlobalQualityReferenceLL() {
-        return normalGlobalQualityReferenceLL;
-    }
-
-    public void setNormalGlobalQualityReferenceLL(double normalGlobalQualityReferenceLL) {
-        this.normalGlobalQualityReferenceLL = normalGlobalQualityReferenceLL;
-    }
-
-    public double getNormalLocalQualityReferenceLL() {
-        return normalLocalQualityReferenceLL;
-    }
-
-    public void setNormalLocalQualityReferenceLL(double normalLocalQualityReferenceLL) {
-        this.normalLocalQualityReferenceLL = normalLocalQualityReferenceLL;
-    }
-
-    public double getNormalQualityModelLod() {
-        return normalQualityModelLod;
-    }
-
-    public void setNormalQualityModelLod(double normalQualityModelLod) {
-        this.normalQualityModelLod = normalQualityModelLod;
-    }
-
-    public double getTumorLodLQS() {
-        return tumorLodLQS;
-    }
-
-    public void setTumorLodLQS(double tumorLodLQS) {
-        this.tumorLodLQS = tumorLodLQS;
-    }
-
-    public double getNormalFQuals() {
-        return normalFQuals;
-    }
-
-    public void setNormalFQuals(double normalFQuals) {
-        this.normalFQuals = normalFQuals;
-    }
-
-    public double getNormalArtifactLodNFQ() {
-        return normalArtifactLodNFQ;
-    }
-
-    public void setNormalArtifactLodNFQ(double normalArtifactLodNFQ) {
-        this.normalArtifactLodNFQ = normalArtifactLodNFQ;
     }
 
     public int getTumorAltMaxMapQ() {

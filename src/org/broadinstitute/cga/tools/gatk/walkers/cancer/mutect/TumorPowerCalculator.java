@@ -7,59 +7,25 @@ import org.apache.commons.math.distribution.BinomialDistributionImpl;
 import java.util.HashMap;
 
 public class TumorPowerCalculator extends AbstractPowerCalculator{
-
-    private static double Q30_EPS = Math.pow(10, (-30/10)) / 3d;
-    private static double LOD = 6.3d;
-
-    public static void main(String[] argv) throws MathException {
-        double wiggle = 0.00001;
-
-        // test log likelihood calculation
-        test(calculateLogLikelihood(50, 5, 0.001, 0.1), -7.059164, wiggle, "Failed!");
-        test(calculateLogLikelihood(40, 5, 0.001, 0.1), -6.597727, wiggle, "Failed!");
-        test(calculateLogLikelihood(40, 10, 0.001, 0.1), -11.34971, wiggle, "Failed!");
-        test(calculateLogLikelihood(40, 10, 0.01, 0.1), -11.15482, wiggle, "Failed!");
-        test(calculateLogLikelihood(40, 10, 0.01, 0.2), -9.866713, wiggle, "Failed!");
-
-
-        test(testCalculatePower(50, Q30_EPS, LOD, 0.15, 0), 0.975342, wiggle, "Failed!");
-
-        test(testCalculatePower(20, Q30_EPS, LOD, 0.15, 0), 0.6364833, wiggle, "Failed!");
-        test(testCalculatePower(10, Q30_EPS, LOD, 0.15, 0), 0.3167154, wiggle, "Failed!");
-        test(testCalculatePower(50, Q30_EPS, LOD, 0.35, 0), 0.9999994, wiggle, "Failed!");
-        test(testCalculatePower(50, Q30_EPS, LOD, 0.05, 0), 0.3893047, wiggle, "Failed!");
-        test(testCalculatePower(50, Q30_EPS, 4.3, 0.05, 0), 0.6068266, wiggle, "Failed!");
-        test(testCalculatePower(50, Q30_EPS, 4.3, 0.05, 0.02), 0.0039135, wiggle, "Failed!");
-
-        // make an instance to test caching
-        TumorPowerCalculator pc = new TumorPowerCalculator(Q30_EPS, LOD, 0);
-        test(pc.cachingPowerCalculation(50, 0.15), 0.975342, wiggle, "Failed!");
-        test(pc.cachingPowerCalculation(50, 0.15), 0.975342, wiggle, "Failed!");
-        test(pc.cachingPowerCalculation(50, 0.15), 0.975342, wiggle, "Failed!");
-
-    }
-
-    private static double testCalculatePower(int n, double eps, double fdr, double delta, double contam) throws MathException {
-        double power = calculatePower(n, eps, fdr, delta, contam);
-        System.out.println("Depth: " + n + " EPS: " + eps + " FDR: " + fdr + " Delta: " + delta + " --> Power: " + power);
-        return power;
-    }
-
-
     private double constantContamination;
+    private boolean enableSmoothing;
 
     public TumorPowerCalculator(double constantEps, double constantLodThreshold, double constantContamination) {
+        this(constantEps, constantLodThreshold, constantContamination, true);
+    }
+
+    public TumorPowerCalculator(double constantEps, double constantLodThreshold, double constantContamination, boolean enableSmoothing) {
         this.constantEps = constantEps;
         this.constantLodThreshold = constantLodThreshold;
         this.constantContamination = constantContamination;
+        this.enableSmoothing = enableSmoothing;
     }
-
 
     public double cachingPowerCalculation(int n, double delta) throws MathException {
         PowerCacheKey key = new PowerCacheKey(n, delta);
         Double power = cache.get(key);
         if (power == null) {
-            power = calculatePower(n, constantEps, constantLodThreshold, delta, constantContamination);
+            power = calculatePower(n, constantEps, constantLodThreshold, delta, constantContamination, enableSmoothing);
             cache.put(key, power);
         }
         return power;        
@@ -68,12 +34,12 @@ public class TumorPowerCalculator extends AbstractPowerCalculator{
 
 
 
-    private static double calculateTumorLod(int depth, int alts, double eps, double contam) {
+    protected static double calculateTumorLod(int depth, int alts, double eps, double contam) {
         double f = (double) alts / (double) depth;
         return (calculateLogLikelihood(depth, alts, eps, f) - calculateLogLikelihood(depth, alts, eps, Math.min(f,contam)));
     }
 
-    private static double calculatePower(int depth, double eps, double lodThreshold, double delta, double contam) throws MathException {
+    protected static double calculatePower(int depth, double eps, double lodThreshold, double delta, double contam, boolean enableSmoothing) throws MathException {
         if (depth==0) return 0;
 
         int n = depth; // for consistency with R code which has an extra outer loop
@@ -113,7 +79,7 @@ public class TumorPowerCalculator extends AbstractPowerCalculator{
         // the k and k-1 bin, so we prorate the power from that bin
         // the k and k-1 bin, so we prorate the power from that bin
         // if k==0, it must be that lodThreshold == lod[k] so we don't have to make this correction
-        if ( k > 0 ) {
+        if ( enableSmoothing && k > 0 ) {
             double x = 1d - (lodThreshold - lod[k-1]) / (lod[k] - lod[k-1]);
             power = x*p[k-1];
         }

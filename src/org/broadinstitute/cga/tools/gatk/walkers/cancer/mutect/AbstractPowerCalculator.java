@@ -46,10 +46,4 @@ public class AbstractPowerCalculator {
         return (a+b);
     }
 
-    protected static void test(double actual, double expected, double tolerance, String msg) {
-        if (Math.abs(actual - expected) > tolerance) {
-            throw new RuntimeException("FAILED: calculated " + actual + " but expected " + expected + " -> " + msg);
-        }
-    }
-
 }

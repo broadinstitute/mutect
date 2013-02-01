@@ -1,45 +1,45 @@
 package org.broadinstitute.cga.tools.gatk.walkers.cancer.mutect;
 
-import java.io.*;
-import java.util.*;
-
 import net.sf.picard.reference.IndexedFastaSequenceFile;
-import net.sf.samtools.*;
-
-import org.broadinstitute.sting.gatk.arguments.DbsnpArgumentCollection;
-import org.broadinstitute.sting.gatk.walkers.annotator.VariantAnnotatorEngine;
-import org.broadinstitute.sting.gatk.walkers.genotyper.UnifiedArgumentCollection;
-import org.broadinstitute.sting.gatk.walkers.genotyper.UnifiedGenotyperEngine;
-import org.broadinstitute.sting.utils.GenomeLoc;
-import org.broadinstitute.sting.utils.codecs.vcf.*;
-import org.broadinstitute.sting.utils.variantcontext.*;
-import org.broadinstitute.sting.utils.variantcontext.writer.VariantContextWriter;
+import net.sf.samtools.CigarElement;
+import net.sf.samtools.CigarOperator;
+import net.sf.samtools.SAMRecord;
+import net.sf.samtools.SAMUtils;
 import org.apache.commons.lang.math.NumberUtils;
-import org.apache.commons.math.distribution.BetaDistribution;
-import org.apache.commons.math.distribution.BetaDistributionImpl;
-import org.broadinstitute.sting.commandline.*;
+import org.broadinstitute.sting.commandline.ArgumentCollection;
+import org.broadinstitute.sting.commandline.Input;
+import org.broadinstitute.sting.commandline.Output;
+import org.broadinstitute.sting.commandline.RodBinding;
 import org.broadinstitute.sting.gatk.contexts.AlignmentContext;
 import org.broadinstitute.sting.gatk.contexts.ReferenceContext;
 import org.broadinstitute.sting.gatk.datasources.reads.SAMReaderID;
 import org.broadinstitute.sting.gatk.refdata.RefMetaDataTracker;
 import org.broadinstitute.sting.gatk.walkers.*;
 import org.broadinstitute.sting.utils.BaseUtils;
+import org.broadinstitute.sting.utils.GenomeLoc;
+import org.broadinstitute.sting.utils.codecs.vcf.*;
 import org.broadinstitute.sting.utils.exceptions.UserException;
-import org.broadinstitute.sting.utils.pileup.ReadBackedPileup;
 import org.broadinstitute.sting.utils.pileup.PileupElement;
+import org.broadinstitute.sting.utils.pileup.ReadBackedPileup;
 import org.broadinstitute.sting.utils.pileup.ReadBackedPileupImpl;
 import org.broadinstitute.sting.utils.sam.AlignmentUtils;
 import org.broadinstitute.sting.utils.sam.GATKSAMRecord;
+import org.broadinstitute.sting.utils.variantcontext.Allele;
+import org.broadinstitute.sting.utils.variantcontext.GenotypeBuilder;
+import org.broadinstitute.sting.utils.variantcontext.VariantContext;
+import org.broadinstitute.sting.utils.variantcontext.VariantContextBuilder;
+import org.broadinstitute.sting.utils.variantcontext.writer.VariantContextWriter;
+
+import java.io.PrintStream;
+import java.util.*;
 
 @PartitionBy(PartitionType.LOCUS)
-@BAQMode()
 @Reference(window=@Window(start=-1* MuTect.REFERENCE_HALF_WINDOW_LENGTH,stop= MuTect.REFERENCE_HALF_WINDOW_LENGTH))
 @By(DataSource.REFERENCE)
 public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducible<Integer> {
     public static final int REFERENCE_HALF_WINDOW_LENGTH = 150;
     public static final String BAM_TAG_TUMOR = "tumor";
     public static final String BAM_TAG_NORMAL = "normal";
-    public static final String BAM_TAG_CONTROL = "control";
 
     // DO NOT CHANGE THIS LINE!  It's the SVN revision number of the caller, which updates automatically!
     private static final String VERSION = "$Rev$";
@@ -59,14 +59,13 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
     // Reference Metadata inputs
     /***************************************/
     @Input(fullName="dbsnp", shortName = "dbsnp", doc="VCF file of DBSNP information", required=false)
-    public List<RodBinding<VariantContext>> dbsnpRod = Collections.emptyList();;
+    public List<RodBinding<VariantContext>> dbsnpRod = Collections.emptyList();
 
     @Input(fullName="cosmic", shortName = "cosmic", doc="VCF file of COSMIC sites", required=false)
-    public List<RodBinding<VariantContext>> cosmicRod = Collections.emptyList();;
+    public List<RodBinding<VariantContext>> cosmicRod = Collections.emptyList();
 
-    @Hidden
     @Input(fullName="normal_panel", shortName = "normal_panel", doc="VCF file of sites observed in normal", required=false)
-    public List<RodBinding<VariantContext>> normalPanelRod = Collections.emptyList();;
+    public List<RodBinding<VariantContext>> normalPanelRod = Collections.emptyList();
 
     /***************************************/
     // coverage outputs
@@ -89,25 +88,15 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
     public int MIN_QSUM_QSCORE = 13;
     public boolean USE_MAPQ0_IN_NORMAL_QSCORE = true;
 
-    private static final FisherExact fisher = new FisherExact(5000);
-
     private boolean hasTumorBam = false;
     private boolean hasNormalBam = false;
 
     private double contaminantAlternateFraction;
 
-    private double powerConstantEps;
     private TumorPowerCalculator tumorPowerCalculator;
     private NormalPowerCalculator normalNovelSitePowerCalculator;
     private NormalPowerCalculator normalDbSNPSitePowerCalculator;
-    private TumorPowerCalculator normalArtifactPowerCalculator;
     private TumorPowerCalculator strandArtifactPowerCalculator;
-
-    private static class ThreadLocalRankSumTest extends ThreadLocal<RankSumTest> {
-        public RankSumTest initialValue() {
-            return new RankSumTest();
-        }
-    }
 
     private static class PileupComparatorByAltRefQual implements Comparator<PileupElement> {
         private byte ref;
@@ -140,7 +129,6 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
 
     private Set<SAMReaderID> tumorSAMReaderIDs = new HashSet<SAMReaderID>();
     private Set<SAMReaderID> normalSAMReaderIDs = new HashSet<SAMReaderID>();
-    private Set<SAMReaderID> controlSAMReaderIDs = new HashSet<SAMReaderID>();
 
     private CallStatsGenerator callStatsGenerator;
 
@@ -148,7 +136,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
     public boolean includeReadsWithDeletionAtLoci() { return true; }
 
     @Override
-	public void initialize() {
+    public void initialize() {
         if (MTAC.NOOP) { return; }
 
         refReader = this.getToolkit().getReferenceDataSource().getReference();
@@ -157,7 +145,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         // check that we have at least one tumor bam
         for(SAMReaderID id : getToolkit().getReadsDataSource().getReaderIDs()) {
             if (id.getTags().getPositionalTags().size() == 0) {
-                throw new RuntimeException("BAMs must be tagged as either 'tumor','normal' or 'control'");
+                throw new RuntimeException("BAMs must be tagged as either 'tumor' or 'normal'");
             }
 
             for(String tag : id.getTags().getPositionalTags()) {
@@ -193,11 +181,9 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                             MTAC.NORMAL_SAMPLE_NAME = "normal";
                         }
                     }
-                } else if (BAM_TAG_CONTROL.equalsIgnoreCase(tag)) {                    
-                    controlSAMReaderIDs.add(id);
                 } else {
-                    throw new RuntimeException("Unknown BAM tag '" + tag + "' must be either 'tumor','normal' or 'control'");
-                }                
+                    throw new RuntimeException("Unknown BAM tag '" + tag + "' must be either 'tumor' or 'normal'");
+                }
             }
         }
 
@@ -205,7 +191,6 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
             throw new RuntimeException("At least one BAM tagged as 'tumor' required");
         }
 
-        // FIXME: update for Control BAM concept
         if (!hasNormalBam) {
             MTAC.NORMAL_LOD_THRESHOLD = -1 * Float.MAX_VALUE;
             MTAC.NORMAL_DBSNP_LOD_THRESHOLD = -1 * Float.MAX_VALUE;
@@ -216,13 +201,12 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         this.contaminantAlternateFraction = Math.max(MTAC.MINIMUM_MUTATION_CELL_FRACTION, MTAC.FRACTION_CONTAMINATION);
 
         // coverage related initialization
-        this.powerConstantEps = Math.pow(10, -1 * (MTAC.POWER_CONSTANT_QSCORE/10));
+        double powerConstantEps = Math.pow(10, -1 * (MTAC.POWER_CONSTANT_QSCORE/10));
 
-        this.tumorPowerCalculator = new TumorPowerCalculator(this.powerConstantEps, MTAC.TUMOR_LOD_THRESHOLD, this.contaminantAlternateFraction);
-        this.normalNovelSitePowerCalculator = new NormalPowerCalculator(this.powerConstantEps, MTAC.NORMAL_LOD_THRESHOLD);
-        this.normalDbSNPSitePowerCalculator = new NormalPowerCalculator(this.powerConstantEps, MTAC.NORMAL_DBSNP_LOD_THRESHOLD);
-        this.normalArtifactPowerCalculator = new TumorPowerCalculator(this.powerConstantEps, MTAC.NORMAL_ARTIFACT_LOD_THRESHOLD, 0.0f);
-        this.strandArtifactPowerCalculator = new TumorPowerCalculator(this.powerConstantEps, MTAC.STRAND_ARTIFACT_LOD_THRESHOLD, 0.0f);
+        this.tumorPowerCalculator = new TumorPowerCalculator(powerConstantEps, MTAC.TUMOR_LOD_THRESHOLD, this.contaminantAlternateFraction);
+        this.normalNovelSitePowerCalculator = new NormalPowerCalculator(powerConstantEps, MTAC.NORMAL_LOD_THRESHOLD);
+        this.normalDbSNPSitePowerCalculator = new NormalPowerCalculator(powerConstantEps, MTAC.NORMAL_DBSNP_LOD_THRESHOLD);
+        this.strandArtifactPowerCalculator = new TumorPowerCalculator(powerConstantEps, MTAC.STRAND_ARTIFACT_LOD_THRESHOLD, 0.0f);
 
         stdCovWriter = new CoverageWiggleFileWriter(COVERAGE_FILE);
         q20CovWriter = new CoverageWiggleFileWriter(COVERAGE_20_Q20_FILE);
@@ -236,7 +220,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         }
 
         // initialize the call-stats file
-        out.println("## muTector v1.0." + VERSION.split(" ")[1]);
+        out.println("## muTect v1.0." + VERSION.split(" ")[1]);
         out.println(callStatsGenerator.generateHeader());
 
         // initialize the VCF output
@@ -252,13 +236,13 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
     }
 
     public static int MAX_INSERT_SIZE = 10000;
-    private int totalReadsProcessed = 0;
-    private int binReadsProcessed = 0;
+    private long totalReadsProcessed = 0;
+    private long binReadsProcessed = 0;
     private long lastTime;
     private int candidatesInspected = 0;
 
     @Override
-	public Integer map(final RefMetaDataTracker tracker, final ReferenceContext ref, final AlignmentContext rawContext) {
+    public Integer map(final RefMetaDataTracker tracker, final ReferenceContext ref, final AlignmentContext rawContext) {
         if (MTAC.NOOP) return 0;
 
         TreeMap<Double, CandidateMutation> messageByTumorLod = new TreeMap<Double, CandidateMutation>();
@@ -275,7 +259,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
             totalReadsProcessed += binReadsProcessed;
             binReadsProcessed = 0;
 
-            logger.info(String.format("[MUTECTOR] Processed %d reads in %d ms", totalReadsProcessed, elapsedTime));
+            logger.info(String.format("[MUTECT] Processed %d reads in %d ms", totalReadsProcessed, elapsedTime));
         }
 
         // an optimization to speed things up when there is no coverage
@@ -294,7 +278,6 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
 
             ArrayList<PileupElement> tumorPileupElements = new ArrayList<PileupElement>();
             ArrayList<PileupElement> normalPileupElements = new ArrayList<PileupElement>();
-            ArrayList<PileupElement> controlPileupElements = new ArrayList<PileupElement>();
 
             int totalPairs = 0;
             int improperPairs = 0;
@@ -322,8 +305,6 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                     tumorPileupElements.add(p);
                 } else if (source == ReadSource.Normal) {
                     normalPileupElements.add(p);
-                } else if (source == ReadSource.Control) {
-                    controlPileupElements.add(p);
                 }
             }
 
@@ -372,33 +353,23 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
             normalDepthWriter.writeCoverage(rawContext, normalBaseCount);
 
             // calculate power
-            // TODO: use ASCN information
-            double tumorPower;
-            double normalPower;
-            double normalPowerWithSNPPrior;
-            double normalPowerNoSNPPrior;
-            double combinedPower;
-            if (MTAC.ABSOLUTE_COPY_NUMBER_DATA == null) {
-                tumorPower = tumorPowerCalculator.cachingPowerCalculation(tumorBaseCount, MTAC.POWER_CONSTANT_AF);
+            double tumorPower = tumorPowerCalculator.cachingPowerCalculation(tumorBaseCount, MTAC.POWER_CONSTANT_AF);
 
-                normalPowerNoSNPPrior = normalNovelSitePowerCalculator.cachingPowerCalculation(normalBaseCount);
-                normalPowerWithSNPPrior = normalDbSNPSitePowerCalculator.cachingPowerCalculation(normalBaseCount);
-                
-                normalPower = (germlineAtRisk)?normalPowerWithSNPPrior:normalPowerNoSNPPrior;
-                
-                combinedPower = tumorPower*normalPower;
-                if (!hasNormalBam) {
-                    combinedPower = tumorPower;
-                }
+            double normalPowerNoSNPPrior = normalNovelSitePowerCalculator.cachingPowerCalculation(normalBaseCount);
+            double normalPowerWithSNPPrior = normalDbSNPSitePowerCalculator.cachingPowerCalculation(normalBaseCount);
 
-                powerWriter.writeCoverage(rawContext, combinedPower);
-            } else {
-                throw new RuntimeException("ASCN Power Calculations Not Yet Implemented!");
+            double normalPower = (germlineAtRisk)?normalPowerWithSNPPrior:normalPowerNoSNPPrior;
+
+            double combinedPower = tumorPower*normalPower;
+            if (!hasNormalBam) {
+                combinedPower = tumorPower;
             }
+
+            powerWriter.writeCoverage(rawContext, combinedPower);
 
             int mapQ0Reads =
                     tumorReadPile.qualityScoreFilteredPileup.getNumberOfMappingQualityZeroReads() +
-                    normalReadPile.qualityScoreFilteredPileup.getNumberOfMappingQualityZeroReads();
+                            normalReadPile.qualityScoreFilteredPileup.getNumberOfMappingQualityZeroReads();
 
 
             // Test each of the possible alternate alleles
@@ -435,26 +406,13 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 }
 
                 if (++candidatesInspected % 1000 == 0) {
-                    logger.info(String.format("[MUTECTOR] Inspected %d potential candidates", candidatesInspected));
+                    logger.info(String.format("[MUTECT] Inspected %d potential candidates", candidatesInspected));
                 }
-                
+
                 candidate.setInitialTumorAltCounts(tumorReadPile.qualitySums.getCounts(altAllele));
                 candidate.setInitialTumorRefCounts(tumorReadPile.qualitySums.getCounts(upRef));
                 candidate.setInitialTumorAltQualitySum(tumorReadPile.qualitySums.getQualitySum(altAllele));
                 candidate.setInitialTumorRefQualitySum(tumorReadPile.qualitySums.getQualitySum(upRef));
-
-                // TODO: why extract the counts twice?  once above and once in this method...
-                double tumorFLB = 0;
-                int refCount = candidate.getInitialTumorRefCounts();
-                int altCount = candidate.getInitialTumorAltCounts();
-                int depth = refCount + altCount;
-                if ( altCount > 0) {
-                    // implemented as shown http://www.sigmazone.com/binomial_confidence_interval.htm
-                    BetaDistribution dist = new BetaDistributionImpl(depth - altCount + 1, altCount);
-                    tumorFLB = 1 - dist.inverseCumulativeProbability(1 - (1-0.95)/2);
-                }
-                candidate.setTumorFLowerBound(tumorFLB);
-
 
                 double tumorLod = tumorReadPile.calculateAltVsRefLOD((byte)altAllele, candidate.getTumorF(), 0);
                 candidate.setTumorLodFStar(tumorLod);
@@ -502,49 +460,16 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 candidate.setContaminantLod(contaminantLod);
 
 
-                // (ii) the quality score sum for the mutant base in the normal must be < 50 and the
-                //      LOD score for ref:ref vs mutant:ref + mutant:mutant must be at least 2.3.
                 final QualitySums normQs = normalReadPile.qualitySums;
 
-                
+
                 VariableAllelicRatioGenotypeLikelihoods normalGl = normalReadPile.calculateLikelihoods(normalReadPile.qualityScoreFilteredPileup); // use MAPQ0 reads
                 candidate.setInitialNormalBestGenotype(normalReadPile.getBestGenotype(normalGl));
                 candidate.setInitialNormalLod(LocusReadPile.getRefVsAlt(normalGl, upRef, altAllele));
 
-// /                candidate.setInitialNormalLod(normalReadPile.calculateRefVsAltLOD(normalReadPile.qualityScoreFilteredPileup, (byte)altAllele, 0.5, 0.0));
 
-                double normalF = Math.max(normalReadPile.estimateAlleleFraction(normalReadPile.qualityScoreFilteredPileup, upRef, altAllele), MTAC.MINIMUM_NORMAL_ALLELE_FRACTION);
+                double normalF = Math.max(LocusReadPile.estimateAlleleFraction(normalReadPile.qualityScoreFilteredPileup, upRef, altAllele), MTAC.MINIMUM_NORMAL_ALLELE_FRACTION);
                 candidate.setNormalF(normalF);
-                candidate.setNormalLodFStar(normalReadPile.calculateRefVsAltLOD(normalReadPile.qualityScoreFilteredPileup, (byte)altAllele, normalF, 0.0));
-
-
-                // calculate power to have detected this artifact in the normal
-                candidate.setNormalArtifactPowerTF(this.normalArtifactPowerCalculator.cachingPowerCalculation(normalBaseCount, candidate.getTumorF()));
-                candidate.setNormalArtifactPowerLowTF(this.normalArtifactPowerCalculator.cachingPowerCalculation(normalBaseCount, candidate.getTumorFLowerBound()));
-                candidate.setNormalArtifactPowerNF(this.normalArtifactPowerCalculator.cachingPowerCalculation(normalBaseCount, candidate.getNormalF()));
-
-
-                // compare the local and global error models
-                RecalibratedLocalQualityScores lqs = new RecalibratedLocalQualityScores((byte) upRef, normalReadPile.finalPileup);
-                double lodOriginalQualities = LocusReadPile.calculateLogLikelihood(normalReadPile.finalPileup, (byte) upRef, (byte) altAllele, 0.0);
-                double lodLqs = LocusReadPile.calculateLogLikelihood(normalReadPile.finalPileup, (byte) upRef, (byte) altAllele, 0.0, lqs);
-                double qLod = lodLqs - lodOriginalQualities;
-                candidate.setNormalGlobalQualityReferenceLL(lodOriginalQualities);
-                candidate.setNormalLocalQualityReferenceLL(lodLqs);
-                candidate.setNormalQualityModelLod(qLod);
-
-                VariableAllelicRatioGenotypeLikelihoods normalArtifactGlTF = normalReadPile.calculateLikelihoods(candidate.getTumorF(), normalReadPile.qualityScoreFilteredPileup);
-                candidate.setNormalArtifactLodTF(normalReadPile.getAltVsRef(normalArtifactGlTF, upRef, altAllele));
-
-                VariableAllelicRatioGenotypeLikelihoods normalArtifactGlLowTF = normalReadPile.calculateLikelihoods(candidate.getTumorFLowerBound(), normalReadPile.qualityScoreFilteredPileup);
-                candidate.setNormalArtifactLodLowTF(normalReadPile.getAltVsRef(normalArtifactGlLowTF, upRef, altAllele));
-
-                VariableAllelicRatioGenotypeLikelihoods normalArtifactGlNF = normalReadPile.calculateLikelihoods(candidate.getNormalF(), normalReadPile.qualityScoreFilteredPileup);
-                candidate.setNormalArtifactLodNF(normalReadPile.getAltVsRef(normalArtifactGlNF, upRef, altAllele));
-
-                candidate.setNormalFQuals(LocusReadPile.estimateAlleleFractionUsingQuals(normalReadPile.qualityScoreFilteredPileup, (byte)upRef, (byte)altAllele));
-                VariableAllelicRatioGenotypeLikelihoods normalArtifactGlNFQ = normalReadPile.calculateLikelihoods(candidate.getNormalFQuals(), normalReadPile.qualityScoreFilteredPileup);
-                candidate.setNormalArtifactLodNFQ(normalReadPile.getAltVsRef(normalArtifactGlNFQ, upRef, altAllele));
 
 
                 candidate.setInitialNormalAltQualitySum(normQs.getQualitySum(altAllele));
@@ -573,30 +498,15 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 double tumorLod2 = t2.calculateAltVsRefLOD((byte)altAllele, candidate.getTumorF(), 0);
                 candidate.setTumorLodFStar(tumorLod2);
 
-                // calculate Tumor LOD with the local quality score
-                candidate.setTumorLodLQS(t2.calculateAltVsRefLOD((byte)altAllele, candidate.getTumorF(), 0, lqs));
-
-                // TODO: why extract the counts twice?  once above and once in this method...
-                tumorFLB = 0;
-                refCount = candidate.getInitialTumorRefCounts();
-                altCount = candidate.getInitialTumorAltCounts();
-                depth = refCount + altCount;
-                if ( altCount > 0) {
-                    // implemented as shown http://www.sigmazone.com/binomial_confidence_interval.htm
-                    BetaDistribution dist = new BetaDistributionImpl(depth - altCount + 1, altCount);
-                    tumorFLB = 1 - dist.inverseCumulativeProbability(1 - (1-0.95)/2);
-                }
-                candidate.setTumorFLowerBound(tumorFLB);
-
                 //TODO: shouldn't this be f2 in the lod calculation instead of the strand specific f values?
                 // TODO: clean up use of forward/reverse vs positive/negative (prefer the latter since GATK uses it)
                 ReadBackedPileup forwardPileup = filterReads(ref, tumorReadPile.finalPileupPositiveStrand, true).finalPileupPositiveStrand;
                 double f2forward = LocusReadPile.estimateAlleleFraction(forwardPileup, upRef, altAllele);
-                candidate.setTumorLodFStarForward(t2.calculateAltVsRefLOD(forwardPileup, (byte)altAllele, f2forward, 0.0, null));
+                candidate.setTumorLodFStarForward(t2.calculateAltVsRefLOD(forwardPileup, (byte)altAllele, f2forward, 0.0));
 
                 ReadBackedPileup reversePileup = filterReads(ref,tumorReadPile.finalPileupNegativeStrand, true).finalPileupNegativeStrand;
                 double f2reverse = LocusReadPile.estimateAlleleFraction(reversePileup, upRef, altAllele);
-                candidate.setTumorLodFStarReverse(t2.calculateAltVsRefLOD(reversePileup, (byte)altAllele, f2reverse, 0.0, null));
+                candidate.setTumorLodFStarReverse(t2.calculateAltVsRefLOD(reversePileup, (byte)altAllele, f2reverse, 0.0));
 
                 // calculate strand bias power
                 candidate.setPowerToDetectPositiveStrandArtifact(
@@ -708,7 +618,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         } catch (Throwable t) {
             System.err.println("Error processing " + rawContext.getContig() + ":" + rawContext.getPosition());
             t.printStackTrace(System.err);
-            
+
             throw new RuntimeException(t);
         }
     }
@@ -758,7 +668,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
     }
 
 
-    // TODO: we can do this more cheaply with a GATKSAMRecord...
+    // TODO: see if this is cheaper with a GATKSAMRecord...
     private boolean isReadHeavilySoftClipped(SAMRecord rec) {
         int total = 0;
         int clipped = 0;
@@ -791,7 +701,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         int[] results = new int[]{a,b,c,d};
         return results;
     }
-    
+
 
     private List<Integer> getForwardOffsetsInRead(ReadBackedPileup p) {
         return getOffsetsInRead(p, true);
@@ -805,15 +715,15 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         List<Integer> positions = new ArrayList<Integer>();
         for(PileupElement pe : p) {
             // TODO: maybe we should be doing start-site distribution, or a clipping aware offset?
-                GATKSAMRecord r = pe.getRead();
+            GATKSAMRecord r = pe.getRead();
 
 
-                positions.add(
-                        Math.abs((int)(p.getLocation().getStart() - (useForwardOffsets?pe.getRead().getAlignmentStart():pe.getRead().getAlignmentEnd())))
+            positions.add(
+                    Math.abs((int)(p.getLocation().getStart() - (useForwardOffsets?pe.getRead().getAlignmentStart():pe.getRead().getAlignmentEnd())))
 // TODO: the following code was for handling reduced reads, but if you use it on non-reduced reads it returns the wrong thing AND there is no way to tell if this is a reduced read!
 //                        Math.abs((int)(p.getLocation().getStart() -
 //                                (useForwardOffsets?r.getOriginalAlignmentStart():r.getOriginalAlignmentEnd())))
-                );
+            );
         }
 
         return positions;
@@ -830,7 +740,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
 
 
         if (candidate.getTumorInsertionCount() >= MTAC.GAP_EVENTS_THRESHOLD ||
-            candidate.getTumorDeletionCount()  >= MTAC.GAP_EVENTS_THRESHOLD) {
+                candidate.getTumorDeletionCount()  >= MTAC.GAP_EVENTS_THRESHOLD) {
             candidate.addRejectionReason("nearby_gap_events");
         }
 
@@ -852,7 +762,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         }
 
         if ( (candidate.getTumorForwardOffsetsInReadMedian() != null && candidate.getTumorForwardOffsetsInReadMedian() <= MTAC.PIR_MEDIAN_THRESHOLD && candidate.getTumorForwardOffsetsInReadMad() != null && candidate.getTumorForwardOffsetsInReadMad() <= MTAC.PIR_MAD_THRESHOLD) ||
-              candidate.getTumorReverseOffsetsInReadMedian() != null && candidate.getTumorReverseOffsetsInReadMedian() <= MTAC.PIR_MEDIAN_THRESHOLD && candidate.getTumorReverseOffsetsInReadMad() != null && candidate.getTumorReverseOffsetsInReadMad() <= MTAC.PIR_MAD_THRESHOLD ) {
+                candidate.getTumorReverseOffsetsInReadMedian() != null && candidate.getTumorReverseOffsetsInReadMedian() <= MTAC.PIR_MEDIAN_THRESHOLD && candidate.getTumorReverseOffsetsInReadMad() != null && candidate.getTumorReverseOffsetsInReadMad() <= MTAC.PIR_MAD_THRESHOLD ) {
             candidate.addRejectionReason("clustered_read_position");
 
         }
@@ -860,7 +770,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         // TODO: sync naming (is it positive or forward)?
         if (
                 (candidate.getPowerToDetectNegativeStrandArtifact() >= MTAC.STRAND_ARTIFACT_POWER_THRESHOLD && candidate.getTumorLodFStarForward() < MTAC.STRAND_ARTIFACT_LOD_THRESHOLD) ||
-                (candidate.getPowerToDetectPositiveStrandArtifact() >= MTAC.STRAND_ARTIFACT_POWER_THRESHOLD && candidate.getTumorLodFStarReverse() < MTAC.STRAND_ARTIFACT_LOD_THRESHOLD)
+                        (candidate.getPowerToDetectPositiveStrandArtifact() >= MTAC.STRAND_ARTIFACT_POWER_THRESHOLD && candidate.getTumorLodFStarReverse() < MTAC.STRAND_ARTIFACT_LOD_THRESHOLD)
                 ) {
             candidate.addRejectionReason("strand_artifact");
         }
@@ -868,7 +778,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         if (candidate.getTotalPairs() > 0 && ((float)candidate.getMapQ0Reads() / (float)candidate.getTotalPairs()) >= MTAC.FRACTION_MAPQ0_THRESHOLD) {
             candidate.addRejectionReason("poor_mapping_region_mapq0");
         }
-        
+
         if (candidate.getTumorAltMaxMapQ() < MTAC.REQUIRED_MAXIMUM_ALT_ALLELE_MAPPING_QUALITY_SCORE) {
             candidate.addRejectionReason("poor_mapping_region_alternate_allele_mapq");
         }
@@ -892,11 +802,11 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
 
     // Given result of map function
     @Override
-	public Integer reduceInit() {
+    public Integer reduceInit() {
         return 0;
     }
     @Override
-	public Integer reduce(final Integer value, final Integer sum) {
+    public Integer reduce(final Integer value, final Integer sum) {
         return 0;
     }
 
@@ -904,7 +814,6 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
 
     int MAX_READ_MISMATCH_QUALITY_SCORE_SUM = 100;
     private static Character MAPPED_BY_MATE = 'M';
-    // TODO: or should we be using this? baqHMM = new BAQ(1e-3, 0.1, bw, (byte)0, true); from the BAQ unit test?
     IndexedFastaSequenceFile refReader;
 
     private LocusReadPile filterReads(final ReferenceContext ref, final ReadBackedPileup pile, boolean filterMateRescueReads) {
@@ -946,17 +855,16 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         return newPile;
     }
 
-    public enum ReadSource { Tumor, Normal, Control }
-    
+    public enum ReadSource { Tumor, Normal }
+
     private ReadSource getReadSource(SAMRecord read) {
         // check if it's a tumor
         SAMReaderID id = getToolkit().getReaderIDForRead(read);
         if (tumorSAMReaderIDs.contains(id)) { return ReadSource.Tumor; }
         if (normalSAMReaderIDs.contains(id)) { return ReadSource.Normal; }
-        if (controlSAMReaderIDs.contains(id)) { return ReadSource.Control; }
-        
+
         // unexpected condition
-        throw new RuntimeException("Unable to determine read source (tumor,normal,control) for read " + read.getReadName());               
+        throw new RuntimeException("Unable to determine read source (tumor,normal) for read " + read.getReadName());
     }
 
     private static Set<VCFHeaderLine> getVCFHeaderInfo(final MuTectArgumentCollection MTAC) {
