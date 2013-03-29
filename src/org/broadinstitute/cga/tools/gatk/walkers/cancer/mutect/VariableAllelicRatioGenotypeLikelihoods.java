@@ -49,7 +49,8 @@
 
 package org.broadinstitute.cga.tools.gatk.walkers.cancer.mutect;
 
-import org.broadinstitute.sting.gatk.walkers.genotyper.*;
+import org.broadinstitute.sting.utils.genotyper.*;
+import org.broadinstitute.sting.gatk.walkers.genotyper.DiploidSNPGenotypeLikelihoods;
 import org.broadinstitute.sting.utils.BaseUtils;
 
 import static java.lang.Math.log10;

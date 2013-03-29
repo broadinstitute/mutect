@@ -50,11 +50,11 @@
 package org.broadinstitute.cga.tools.gatk.walkers.cancer.mutect;
 
 import org.broadinstitute.sting.utils.GenomeLoc;
-import org.broadinstitute.sting.utils.codecs.vcf.*;
-import org.broadinstitute.sting.utils.variantcontext.Allele;
-import org.broadinstitute.sting.utils.variantcontext.GenotypeBuilder;
-import org.broadinstitute.sting.utils.variantcontext.VariantContext;
-import org.broadinstitute.sting.utils.variantcontext.VariantContextBuilder;
+import org.broadinstitute.variant.vcf.*;
+import org.broadinstitute.variant.variantcontext.Allele;
+import org.broadinstitute.variant.variantcontext.GenotypeBuilder;
+import org.broadinstitute.variant.variantcontext.VariantContext;
+import org.broadinstitute.variant.variantcontext.VariantContextBuilder;
 
 import java.util.Arrays;
 import java.util.HashSet;

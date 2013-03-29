@@ -61,15 +61,16 @@ import org.broadinstitute.sting.gatk.contexts.ReferenceContext;
 import org.broadinstitute.sting.gatk.datasources.reads.SAMReaderID;
 import org.broadinstitute.sting.gatk.refdata.RefMetaDataTracker;
 import org.broadinstitute.sting.gatk.walkers.*;
-import org.broadinstitute.sting.utils.codecs.vcf.VCFHeader;
-import org.broadinstitute.sting.utils.codecs.vcf.VCFHeaderLine;
+import org.broadinstitute.variant.vcf.VCFHeader;
+import org.broadinstitute.variant.vcf.VCFHeaderLine;
 import org.broadinstitute.sting.utils.pileup.PileupElement;
 import org.broadinstitute.sting.utils.pileup.ReadBackedPileup;
 import org.broadinstitute.sting.utils.pileup.ReadBackedPileupImpl;
 import org.broadinstitute.sting.utils.sam.AlignmentUtils;
+import org.broadinstitute.cga.tools.gatk.utils.CGAAlignmentUtils;
 import org.broadinstitute.sting.utils.sam.GATKSAMRecord;
-import org.broadinstitute.sting.utils.variantcontext.VariantContext;
-import org.broadinstitute.sting.utils.variantcontext.writer.VariantContextWriter;
+import org.broadinstitute.variant.variantcontext.VariantContext;
+import org.broadinstitute.variant.variantcontext.writer.VariantContextWriter;
 
 import java.io.PrintStream;
 import java.util.*;
@@ -756,7 +757,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
             final GATKSAMRecord read = p.getRead();
 
             int mismatchQualitySum =
-                    AlignmentUtils.mismatchesInRefWindow(p, ref, false, true);
+                    CGAAlignmentUtils.mismatchesInRefWindow(p, ref, false, true);
 
             // do we have to many mismatches overall?
             if (mismatchQualitySum > this.MAX_READ_MISMATCH_QUALITY_SCORE_SUM) {
@@ -774,7 +775,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
             }
 
             // if we're here... we passed all the read filters!
-            newPileupElements.add(new PileupElement(read, p.getOffset(), p.isDeletion(), p.isBeforeDeletionStart(), p.isAfterDeletionEnd(), p.isBeforeInsertion(), p.isAfterInsertion(),p.isNextToSoftClip()));
+			            newPileupElements.add(new PileupElement(read, p.getOffset(), p.isDeletion(), p.isBeforeDeletionStart(), p.isAfterDeletionEnd(), p.isBeforeInsertion(), p.isAfterInsertion(),p.isNextToSoftClip()));
 
 
         }

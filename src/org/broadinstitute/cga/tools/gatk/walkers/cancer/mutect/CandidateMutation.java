@@ -50,8 +50,8 @@
 package org.broadinstitute.cga.tools.gatk.walkers.cancer.mutect;
 
 import org.broadinstitute.sting.utils.GenomeLoc;
-import org.broadinstitute.sting.utils.variantcontext.VariantContext;
-import org.broadinstitute.sting.gatk.walkers.genotyper.DiploidGenotype;
+import org.broadinstitute.variant.variantcontext.VariantContext;
+import org.broadinstitute.sting.utils.genotyper.DiploidGenotype;
 
 import java.util.ArrayList;
 import java.util.Collection;
