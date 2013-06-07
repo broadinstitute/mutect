@@ -775,7 +775,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
             }
 
             // if we're here... we passed all the read filters!
-			            newPileupElements.add(new PileupElement(read, p.getOffset(), p.isDeletion(), p.isBeforeDeletionStart(), p.isAfterDeletionEnd(), p.isBeforeInsertion(), p.isAfterInsertion(),p.isNextToSoftClip()));
+			            newPileupElements.add(new PileupElement(p));
 
 
         }
