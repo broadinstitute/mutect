@@ -109,19 +109,19 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
     /***************************************/
     // coverage outputs
     /***************************************/
-    @Argument(fullName="coverage_file", shortName="cov", doc="write out coverage in WIGGLE format to this file", required=false)
+    @Output(fullName="coverage_file", shortName="cov", doc="write out coverage in WIGGLE format to this file", required=false, defaultToStdout=false)
     public PrintStream COVERAGE_FILE = null;
 
-    @Argument(fullName="coverage_20_q20_file", shortName="cov_q20", doc="write out 20x of Q20 coverage in WIGGLE format to this file", required=false)
+    @Output(fullName="coverage_20_q20_file", shortName="cov_q20", doc="write out 20x of Q20 coverage in WIGGLE format to this file", required=false, defaultToStdout=false)
     public PrintStream COVERAGE_20_Q20_FILE = null;
 
-    @Argument(fullName="power_file", shortName="pow", doc="write out power in WIGGLE format to this file", required=false)
+    @Output(fullName="power_file", shortName="pow", doc="write out power in WIGGLE format to this file", required=false, defaultToStdout=false)
     public PrintStream POWER_FILE = null;
 
-    @Argument(fullName="tumor_depth_file", shortName="tdf", doc="write out tumor read depth in WIGGLE format to this file", required=false)
+    @Output(fullName="tumor_depth_file", shortName="tdf", doc="write out tumor read depth in WIGGLE format to this file", required=false, defaultToStdout=false)
     public PrintStream TUMOR_DEPTH_FILE = null;
 
-    @Argument(fullName="normal_depth_file", shortName="ndf", doc="write out normal read depth in WIGGLE format to this file", required=false)
+    @Output(fullName="normal_depth_file", shortName="ndf", doc="write out normal read depth in WIGGLE format to this file", required=false, defaultToStdout=false)
     public PrintStream NORMAL_DEPTH_FILE = null;
 
     public int MIN_QSUM_QSCORE = 13;
