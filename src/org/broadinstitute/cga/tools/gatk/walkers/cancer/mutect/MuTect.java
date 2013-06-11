@@ -52,10 +52,7 @@ package org.broadinstitute.cga.tools.gatk.walkers.cancer.mutect;
 import net.sf.picard.reference.IndexedFastaSequenceFile;
 import net.sf.samtools.SAMRecord;
 import org.apache.commons.lang.math.NumberUtils;
-import org.broadinstitute.sting.commandline.ArgumentCollection;
-import org.broadinstitute.sting.commandline.Input;
-import org.broadinstitute.sting.commandline.Output;
-import org.broadinstitute.sting.commandline.RodBinding;
+import org.broadinstitute.sting.commandline.*;
 import org.broadinstitute.sting.gatk.contexts.AlignmentContext;
 import org.broadinstitute.sting.gatk.contexts.ReferenceContext;
 import org.broadinstitute.sting.gatk.datasources.reads.SAMReaderID;
@@ -112,19 +109,19 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
     /***************************************/
     // coverage outputs
     /***************************************/
-    @Output(fullName="coverage_file", shortName="cov", doc="write out coverage in WIGGLE format to this file", required=false)
+    @Argument(fullName="coverage_file", shortName="cov", doc="write out coverage in WIGGLE format to this file", required=false)
     public PrintStream COVERAGE_FILE = null;
 
-    @Output(fullName="coverage_20_q20_file", shortName="cov_q20", doc="write out 20x of Q20 coverage in WIGGLE format to this file", required=false)
+    @Argument(fullName="coverage_20_q20_file", shortName="cov_q20", doc="write out 20x of Q20 coverage in WIGGLE format to this file", required=false)
     public PrintStream COVERAGE_20_Q20_FILE = null;
 
-    @Output(fullName="power_file", shortName="pow", doc="write out power in WIGGLE format to this file", required=false)
+    @Argument(fullName="power_file", shortName="pow", doc="write out power in WIGGLE format to this file", required=false)
     public PrintStream POWER_FILE = null;
 
-    @Output(fullName="tumor_depth_file", shortName="tdf", doc="write out tumor read depth in WIGGLE format to this file", required=false)
+    @Argument(fullName="tumor_depth_file", shortName="tdf", doc="write out tumor read depth in WIGGLE format to this file", required=false)
     public PrintStream TUMOR_DEPTH_FILE = null;
 
-    @Output(fullName="normal_depth_file", shortName="ndf", doc="write out normal read depth in WIGGLE format to this file", required=false)
+    @Argument(fullName="normal_depth_file", shortName="ndf", doc="write out normal read depth in WIGGLE format to this file", required=false)
     public PrintStream NORMAL_DEPTH_FILE = null;
 
     public int MIN_QSUM_QSCORE = 13;
