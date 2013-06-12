@@ -54,6 +54,7 @@ import net.sf.samtools.SAMRecord;
 import org.apache.commons.lang.math.NumberUtils;
 import org.broadinstitute.sting.commandline.*;
 import org.broadinstitute.sting.gatk.contexts.AlignmentContext;
+import org.broadinstitute.sting.gatk.CommandLineGATK;
 import org.broadinstitute.sting.gatk.contexts.ReferenceContext;
 import org.broadinstitute.sting.gatk.datasources.reads.SAMReaderID;
 import org.broadinstitute.sting.gatk.refdata.RefMetaDataTracker;
@@ -66,6 +67,7 @@ import org.broadinstitute.sting.utils.pileup.ReadBackedPileupImpl;
 import org.broadinstitute.sting.utils.sam.AlignmentUtils;
 import org.broadinstitute.cga.tools.gatk.utils.CGAAlignmentUtils;
 import org.broadinstitute.sting.utils.sam.GATKSAMRecord;
+import org.broadinstitute.sting.utils.text.TextFormattingUtils;
 import org.broadinstitute.variant.variantcontext.VariantContext;
 import org.broadinstitute.variant.variantcontext.writer.VariantContextWriter;
 
@@ -80,8 +82,6 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
     public static final String BAM_TAG_TUMOR = "tumor";
     public static final String BAM_TAG_NORMAL = "normal";
 
-    // DO NOT CHANGE THIS LINE!  It's the SVN revision number of the caller, which updates automatically!
-    private static final String VERSION = "$Rev$";
 
     @ArgumentCollection private MuTectArgumentCollection MTAC = new MuTectArgumentCollection();
 
@@ -181,6 +181,12 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         if (MTAC.NOOP) {
             return;
         }
+        //setting version info
+        final String gatkVersion = CommandLineGATK.getVersionNumber();
+        ResourceBundle resources = TextFormattingUtils.loadResourceBundle("CGAText");
+        final String mutectVersion = resources.containsKey("version")? resources.getString("version") : "<unknown>";        
+        final String combinedVersion = "MuTect:"+mutectVersion+" Gatk:"+gatkVersion;
+
 
         refReader = this.getToolkit().getReferenceDataSource().getReference();
         callStatsGenerator = new CallStatsGenerator(MTAC.ENABLE_EXTENDED_OUTPUT);
@@ -263,7 +269,8 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         }
 
         // initialize the call-stats file
-        out.println("## muTect v1.0." + VERSION.split(" ")[1]);
+        //out.println("## muTect v1.0." + VERSION.split(" ")[1]);
+        out.println("##"+combinedVersion);
         out.println(callStatsGenerator.generateHeader());
 
         // initialize the VCF output
