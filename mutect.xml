@@ -7,6 +7,9 @@
     <dependencies>
       <!-- Walkers in this package -->
       <class name="org.broadinstitute.cga.tools.gatk.walkers.cancer.mutect.MuTect" />
+      <class name="org.broadinstitute.cga.tools.gatk.walkers.cancer.simulation.SomaticSpike" />
+
+
       <!-- Some additional dependencies that bcel is unable to find on its own -->
       <package name="org.broad.tribble.*" />
       <package name="org.broadinstitute.cga.tools.gatk.filters" />
