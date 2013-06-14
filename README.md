@@ -1,6 +1,3 @@
-MuTect -- Accurate and Sensitive Mutation Detection in NGS Data
-====================
-
 Overview
 --------------------------------------------------------
 For complete details see
