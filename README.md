@@ -1,4 +1,5 @@
 MuTect -- Accurate and Sensitive Mutation Detection in NGS Data
+====================
 
 Overview
 --------------------------------------------------------
@@ -20,18 +21,18 @@ To compile MuTect you must be using Java 1.6 and Ant 1.8.  In addition, In addit
 
 BUILD STEPS
 
-# make a new source directory (e.g. mutect-src)
-mkdir mutect-src
-cd mutect-src
+    # make a new source directory (e.g. mutect-src)
+    mkdir mutect-src
+    cd mutect-src
 
-# get MuTect source
-git clone git@github.com:broadinstitute/mutect.git
-cd ..
+    # get MuTect source
+    git clone git@github.com:broadinstitute/mutect.git
+    cd ..
 
-# get the GATK source and set to the latest tested version
-git clone git@github.com:broadgsa/gatk-protected.git
-cd gatk-protected
-git reset --hard 2.5
-
-# build
-ant -Dexternal.dir=`pwd`/../mutect-src -Dexecutable=mutect package
+    # get the GATK source and set to the latest tested version
+    git clone git@github.com:broadgsa/gatk-protected.git
+    cd gatk-protected
+    git reset --hard 2.5
+    
+    # build
+    ant -Dexternal.dir=`pwd`/../mutect-src -Dexecutable=mutect package
