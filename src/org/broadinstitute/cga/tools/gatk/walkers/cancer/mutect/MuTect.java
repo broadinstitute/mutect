@@ -52,24 +52,26 @@ package org.broadinstitute.cga.tools.gatk.walkers.cancer.mutect;
 import net.sf.picard.reference.IndexedFastaSequenceFile;
 import net.sf.samtools.SAMRecord;
 import org.apache.commons.lang.math.NumberUtils;
-import org.broadinstitute.sting.commandline.*;
-import org.broadinstitute.sting.gatk.contexts.AlignmentContext;
+import org.broadinstitute.cga.tools.gatk.utils.CGAAlignmentUtils;
+import org.broadinstitute.sting.commandline.ArgumentCollection;
+import org.broadinstitute.sting.commandline.Input;
+import org.broadinstitute.sting.commandline.Output;
+import org.broadinstitute.sting.commandline.RodBinding;
 import org.broadinstitute.sting.gatk.CommandLineGATK;
+import org.broadinstitute.sting.gatk.contexts.AlignmentContext;
 import org.broadinstitute.sting.gatk.contexts.ReferenceContext;
 import org.broadinstitute.sting.gatk.datasources.reads.SAMReaderID;
 import org.broadinstitute.sting.gatk.refdata.RefMetaDataTracker;
 import org.broadinstitute.sting.gatk.walkers.*;
-import org.broadinstitute.variant.vcf.VCFHeader;
-import org.broadinstitute.variant.vcf.VCFHeaderLine;
 import org.broadinstitute.sting.utils.pileup.PileupElement;
 import org.broadinstitute.sting.utils.pileup.ReadBackedPileup;
 import org.broadinstitute.sting.utils.pileup.ReadBackedPileupImpl;
-import org.broadinstitute.sting.utils.sam.AlignmentUtils;
-import org.broadinstitute.cga.tools.gatk.utils.CGAAlignmentUtils;
 import org.broadinstitute.sting.utils.sam.GATKSAMRecord;
 import org.broadinstitute.sting.utils.text.TextFormattingUtils;
 import org.broadinstitute.variant.variantcontext.VariantContext;
 import org.broadinstitute.variant.variantcontext.writer.VariantContextWriter;
+import org.broadinstitute.variant.vcf.VCFHeader;
+import org.broadinstitute.variant.vcf.VCFHeaderLine;
 
 import java.io.PrintStream;
 import java.util.*;
@@ -138,11 +140,9 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
     private TumorPowerCalculator strandArtifactPowerCalculator;
 
     private static class PileupComparatorByAltRefQual implements Comparator<PileupElement> {
-        private byte ref;
         private byte alt;
 
-        private PileupComparatorByAltRefQual(byte ref, byte alt) {
-            this.ref = ref;
+        private PileupComparatorByAltRefQual(byte alt) {
             this.alt = alt;
         }
 
@@ -485,7 +485,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                     peList.add(pe);
                 }
 
-                Collections.sort(peList, new PileupComparatorByAltRefQual((byte)upRef,(byte)altAllele));
+                Collections.sort(peList, new PileupComparatorByAltRefQual((byte)altAllele));
                 int readsToKeep = (int) (peList.size() * contaminantAlternateFraction);
 
                 for(PileupElement pe : peList) {
