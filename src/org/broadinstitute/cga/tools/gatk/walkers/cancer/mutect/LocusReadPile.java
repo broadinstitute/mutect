@@ -51,13 +51,17 @@ package org.broadinstitute.cga.tools.gatk.walkers.cancer.mutect;
 
 import net.sf.samtools.CigarElement;
 import net.sf.samtools.CigarOperator;
-
-import java.util.*;
-
-import org.broadinstitute.sting.utils.genotyper.DiploidGenotype;
-import org.broadinstitute.sting.utils.pileup.*;
 import org.broadinstitute.sting.utils.BaseUtils;
+import org.broadinstitute.sting.utils.genotyper.DiploidGenotype;
+import org.broadinstitute.sting.utils.pileup.PileupElement;
+import org.broadinstitute.sting.utils.pileup.ReadBackedPileup;
+import org.broadinstitute.sting.utils.pileup.ReadBackedPileupImpl;
 import org.broadinstitute.sting.utils.sam.GATKSAMRecord;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static java.lang.Math.pow;
 
@@ -69,7 +73,7 @@ public class LocusReadPile {
     protected char refBase;
     protected int minQualityScore;
     protected int minQSumQualityScore;
-    protected QualitySums qualitySums = new QualitySums();
+    protected QualitySums qualitySums;
 
     public ReadBackedPileup initialPileup;
     protected ReadBackedPileup qualityScoreFilteredPileup;
@@ -83,11 +87,12 @@ public class LocusReadPile {
     protected int deletionsCount = 0;
     protected int insertionsCount = 0;
 
-    public LocusReadPile(ReadBackedPileup pileup, char refBase, int minQualityScore, int minQSumQualityScore) {
-        this(pileup, refBase, minQualityScore, minQSumQualityScore, false, false);
+    public LocusReadPile(ReadBackedPileup pileup, char refBase, int minQualityScore, int minQSumQualityScore, boolean trackBaseQualityScores) {
+        this(pileup, refBase, minQualityScore, minQSumQualityScore, false, false, trackBaseQualityScores);
     }
 
-    public LocusReadPile(ReadBackedPileup pileup, char refBase, int minQualityScore, int minQSumQualityScore, boolean allowMapq0ForQualSum, boolean retainOverlapMismatches) {
+    public LocusReadPile(ReadBackedPileup pileup, char refBase, int minQualityScore, int minQSumQualityScore, boolean allowMapq0ForQualSum, boolean retainOverlapMismatches, boolean trackBaseQualityScores) {
+        this.qualitySums = new QualitySums(trackBaseQualityScores);
         this.pileup = pileup;
         this.refBase = refBase;
         this.minQSumQualityScore = minQSumQualityScore;

@@ -49,7 +49,8 @@
 
 package org.broadinstitute.cga.tools.gatk.walkers.cancer.mutect;
 
-import org.broadinstitute.sting.commandline.*;
+import org.broadinstitute.sting.commandline.Argument;
+import org.broadinstitute.sting.commandline.Hidden;
 
 public class MuTectArgumentCollection {
     @Hidden
@@ -58,6 +59,9 @@ public class MuTectArgumentCollection {
 
     @Argument(fullName = "enable_extended_output", required = false, doc="add many additional columns of statistics to the output file")
     public boolean ENABLE_EXTENDED_OUTPUT = false;
+
+    @Argument(fullName = "enable_qscore_output", required = false, doc="output quality scores of all bases used for ref and alt")
+    public boolean ENABLE_QSCORE_OUTPUT = false;
 
     @Argument(fullName = "artifact_detection_mode", required = false, doc="used when running the caller on a normal (as if it were a tumor) to detect artifacts")
     public boolean ARTIFACT_DETECTION_MODE = false;

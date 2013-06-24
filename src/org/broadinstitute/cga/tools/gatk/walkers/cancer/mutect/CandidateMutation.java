@@ -50,8 +50,8 @@
 package org.broadinstitute.cga.tools.gatk.walkers.cancer.mutect;
 
 import org.broadinstitute.sting.utils.GenomeLoc;
-import org.broadinstitute.variant.variantcontext.VariantContext;
 import org.broadinstitute.sting.utils.genotyper.DiploidGenotype;
+import org.broadinstitute.variant.variantcontext.VariantContext;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -128,6 +128,12 @@ public class CandidateMutation {
 
     private int tumorInsertionCount;
     private int tumorDeletionCount;
+
+    // quality score info
+    private List<Integer> tumorRefQualityScores;
+    private List<Integer> tumorAltQualityScores;
+    private List<Integer> normalRefQualityScores;
+    private List<Integer> normalAltQualityScores;
 
     private List<String> rejectionReasons = new ArrayList<String>();
     private boolean rejected = false; // summary judgement... keep or reject the site
@@ -628,6 +634,38 @@ public class CandidateMutation {
 
     public void setTumorRefMaxMapQ(int tumorRefMaxMapQ) {
         this.tumorRefMaxMapQ = tumorRefMaxMapQ;
+    }
+
+    public List<Integer> getTumorRefQualityScores() {
+        return tumorRefQualityScores;
+    }
+
+    public void setTumorRefQualityScores(List<Integer> tumorRefQualityScores) {
+        this.tumorRefQualityScores = tumorRefQualityScores;
+    }
+
+    public List<Integer> getTumorAltQualityScores() {
+        return tumorAltQualityScores;
+    }
+
+    public void setTumorAltQualityScores(List<Integer> tumorAltQualityScores) {
+        this.tumorAltQualityScores = tumorAltQualityScores;
+    }
+
+    public List<Integer> getNormalRefQualityScores() {
+        return normalRefQualityScores;
+    }
+
+    public void setNormalRefQualityScores(List<Integer> normalRefQualityScores) {
+        this.normalRefQualityScores = normalRefQualityScores;
+    }
+
+    public List<Integer> getNormalAltQualityScores() {
+        return normalAltQualityScores;
+    }
+
+    public void setNormalAltQualityScores(List<Integer> normalAltQualityScores) {
+        this.normalAltQualityScores = normalAltQualityScores;
     }
 }
 

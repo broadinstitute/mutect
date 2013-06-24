@@ -189,7 +189,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
 
 
         refReader = this.getToolkit().getReferenceDataSource().getReference();
-        callStatsGenerator = new CallStatsGenerator(MTAC.ENABLE_EXTENDED_OUTPUT);
+        callStatsGenerator = new CallStatsGenerator(MTAC.ENABLE_QSCORE_OUTPUT);
 
         // check that we have at least one tumor bam
         for(SAMReaderID id : getToolkit().getReadsDataSource().getReaderIDs()) {
@@ -368,8 +368,8 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 tumorPileup = tumorPileup.getPileupForSample(MTAC.BAM_TUMOR_SAMPLE_NAME);
             }
 
-            final LocusReadPile tumorReadPile = new LocusReadPile(tumorPileup, upRef, MTAC.MIN_QSCORE, MIN_QSUM_QSCORE, false, MTAC.ARTIFACT_DETECTION_MODE);
-            final LocusReadPile normalReadPile = new LocusReadPile(normalPileup, upRef, MTAC.MIN_QSCORE, 0, this.USE_MAPQ0_IN_NORMAL_QSCORE, true);
+            final LocusReadPile tumorReadPile = new LocusReadPile(tumorPileup, upRef, MTAC.MIN_QSCORE, MIN_QSUM_QSCORE, false, MTAC.ARTIFACT_DETECTION_MODE, MTAC.ENABLE_QSCORE_OUTPUT);
+            final LocusReadPile normalReadPile = new LocusReadPile(normalPileup, upRef, MTAC.MIN_QSCORE, 0, this.USE_MAPQ0_IN_NORMAL_QSCORE, true, MTAC.ENABLE_QSCORE_OUTPUT);
 
 
             Collection<VariantContext> panelOfNormalsVC = tracker.getValues(normalPanelRod, rawContext.getLocation());
@@ -520,6 +520,9 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 candidate.setInitialNormalAltQualitySum(normQs.getQualitySum(altAllele));
                 candidate.setInitialNormalRefQualitySum(normQs.getQualitySum(upRef));
 
+                candidate.setNormalAltQualityScores(normQs.getBaseQualityScores(altAllele));
+                candidate.setNormalRefQualityScores(normQs.getBaseQualityScores(upRef));
+
                 candidate.setInitialNormalAltCounts(normQs.getCounts(altAllele));
                 candidate.setInitialNormalRefCounts(normQs.getCounts(upRef));
                 candidate.setInitialNormalReadDepth(normalReadPile.finalPileupReads.size());
@@ -534,6 +537,9 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 candidate.setInitialTumorRefCounts(t2.qualitySums.getCounts(upRef));
                 candidate.setInitialTumorAltQualitySum(t2.qualitySums.getQualitySum(altAllele));
                 candidate.setInitialTumorRefQualitySum(t2.qualitySums.getQualitySum(upRef));
+
+                candidate.setTumorAltQualityScores(t2.qualitySums.getBaseQualityScores(altAllele));
+                candidate.setTumorRefQualityScores(t2.qualitySums.getBaseQualityScores(upRef));
 
                 VariableAllelicRatioGenotypeLikelihoods t2Gl = t2.calculateLikelihoods(t2.finalPileup);
                 candidate.setInitialTumorLod(t2.getAltVsRef(t2Gl, upRef, altAllele));
@@ -585,8 +591,8 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                         new ReadBackedPileupImpl(rawContext.getLocation(), referencePileupElements);
 
                 // TODO: shouldn't this be refAllele here?
-                final LocusReadPile mutantPile = new LocusReadPile(mutantPileup, altAllele, 0, 0);
-                final LocusReadPile refPile =  new LocusReadPile(referencePileup, altAllele, 0, 0);
+                final LocusReadPile mutantPile = new LocusReadPile(mutantPileup, altAllele, 0, 0, MTAC.ENABLE_QSCORE_OUTPUT);
+                final LocusReadPile refPile =  new LocusReadPile(referencePileup, altAllele, 0, 0, MTAC.ENABLE_QSCORE_OUTPUT);
 
                 // Set the maximum observed mapping quality score for the reference and alternate alleles
                 byte[] rmq = referencePileup.getMappingQuals();
@@ -787,7 +793,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 new ReadBackedPileupImpl(ref.getLocus(), newPileupElements);
 
 
-        return new LocusReadPile(newPileup, (char)ref.getBase(), 0, 0);
+        return new LocusReadPile(newPileup, (char)ref.getBase(), 0, 0, MTAC.ENABLE_QSCORE_OUTPUT);
     }
 
     public enum ReadSource { Tumor, Normal }

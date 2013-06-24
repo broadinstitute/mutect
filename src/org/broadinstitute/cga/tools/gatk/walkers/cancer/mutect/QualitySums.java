@@ -49,6 +49,9 @@
 
 package org.broadinstitute.cga.tools.gatk.walkers.cancer.mutect;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class QualitySums {
     private int a = 0;
     private int c = 0;
@@ -58,6 +61,17 @@ public class QualitySums {
     private int cCounts = 0;
     private int gCounts = 0;
     private int tCounts = 0;
+
+    // used for tracking individual base quality scores, if requested (expensive)
+    private boolean enableQualityScoreTracking = false;
+    private List<Integer> aQualityScores = new ArrayList<Integer>();
+    private List<Integer> cQualityScores = new ArrayList<Integer>();
+    private List<Integer> gQualityScores = new ArrayList<Integer>();
+    private List<Integer> tQualityScores = new ArrayList<Integer>();
+
+    public QualitySums(boolean enableQualityScoreTracking) {
+        this.enableQualityScoreTracking = enableQualityScoreTracking;
+    }
 
     public int getQualitySum(final char base) {
         if (base == 'a' || base == 'A') { return a; }
@@ -76,11 +90,13 @@ public class QualitySums {
     }
 
     public void incrementSum(final char base, final int count, final int qualSum) {
-        if (base == 'a' || base == 'A')      { a += qualSum; aCounts+=count;}
-        else if (base == 'c' || base == 'C') { c += qualSum; cCounts+=count;}
-        else if (base == 'g' || base == 'G') { g += qualSum; gCounts+=count; }
-        else if (base == 't' || base == 'T') { t += qualSum; tCounts+=count; }
+        if (base == 'a' || base == 'A')      { a += qualSum; aCounts+=count; if (enableQualityScoreTracking) aQualityScores.add(qualSum);}
+        else if (base == 'c' || base == 'C') { c += qualSum; cCounts+=count; if (enableQualityScoreTracking) cQualityScores.add(qualSum);}
+        else if (base == 'g' || base == 'G') { g += qualSum; gCounts+=count; if (enableQualityScoreTracking) gQualityScores.add(qualSum);}
+        else if (base == 't' || base == 'T') { t += qualSum; tCounts+=count; if (enableQualityScoreTracking) tQualityScores.add(qualSum);}
         else throw new RuntimeException("Unknown base: " + base);
+
+
     }
 
     public int getOtherQualities(final char base) {
@@ -92,9 +108,21 @@ public class QualitySums {
         else throw new RuntimeException("Unknown base: " + base);
     }
 
+    public List<Integer> getBaseQualityScores(final char base) {
+        if (base == 'a' || base == 'A') { return aQualityScores; }
+        if (base == 'c' || base == 'C') { return cQualityScores; }
+        if (base == 'g' || base == 'G') { return gQualityScores; }
+        if (base == 't' || base == 'T') { return tQualityScores; }
+        throw new RuntimeException("Unknown base: " + base);
+    }
+
     public void reset() {
         a = 0; c = 0; g = 0; t = 0;
         aCounts = 0; cCounts = 0; gCounts = 0; tCounts = 0;
+        aQualityScores.clear();
+        cQualityScores.clear();
+        gQualityScores.clear();
+        tQualityScores.clear();
     }
 }
 
