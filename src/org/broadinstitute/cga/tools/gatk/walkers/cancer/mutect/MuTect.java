@@ -187,6 +187,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         final String mutectVersion = resources.containsKey("version")? resources.getString("version") : "<unknown>";        
         final String combinedVersion = "MuTect:"+mutectVersion+" Gatk:"+gatkVersion;
 
+        logger.info("VERSION INFO: " + combinedVersion);
 
         refReader = this.getToolkit().getReferenceDataSource().getReference();
         callStatsGenerator = new CallStatsGenerator(MTAC.ENABLE_QSCORE_OUTPUT);
