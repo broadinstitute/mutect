@@ -49,20 +49,8 @@
 
 package org.broadinstitute.cga.tools.gatk.walkers.cancer.mutect;
 
-import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.ResourceBundle;
-import java.util.Set;
-import java.util.TreeMap;
-
 import net.sf.picard.reference.IndexedFastaSequenceFile;
 import net.sf.samtools.SAMRecord;
-
 import org.apache.commons.lang.math.NumberUtils;
 import org.broadinstitute.cga.tools.gatk.utils.CGAAlignmentUtils;
 import org.broadinstitute.sting.commandline.ArgumentCollection;
@@ -74,14 +62,8 @@ import org.broadinstitute.sting.gatk.contexts.AlignmentContext;
 import org.broadinstitute.sting.gatk.contexts.ReferenceContext;
 import org.broadinstitute.sting.gatk.datasources.reads.SAMReaderID;
 import org.broadinstitute.sting.gatk.refdata.RefMetaDataTracker;
-import org.broadinstitute.sting.gatk.walkers.LocusWalker;
-import org.broadinstitute.sting.gatk.walkers.PartitionBy;
-import org.broadinstitute.sting.gatk.walkers.PartitionType;
-import org.broadinstitute.sting.gatk.walkers.Reference;
-import org.broadinstitute.sting.gatk.walkers.TreeReducible;
-import org.broadinstitute.sting.gatk.walkers.Window;
+import org.broadinstitute.sting.gatk.walkers.*;
 import org.broadinstitute.sting.utils.pileup.PileupElement;
-import org.broadinstitute.sting.utils.pileup.PileupElementFilter;
 import org.broadinstitute.sting.utils.pileup.ReadBackedPileup;
 import org.broadinstitute.sting.utils.pileup.ReadBackedPileupImpl;
 import org.broadinstitute.sting.utils.sam.GATKSAMRecord;
@@ -91,53 +73,57 @@ import org.broadinstitute.variant.variantcontext.writer.VariantContextWriter;
 import org.broadinstitute.variant.vcf.VCFHeader;
 import org.broadinstitute.variant.vcf.VCFHeaderLine;
 
+import java.io.PrintStream;
+import java.util.*;
+
 @PartitionBy(PartitionType.LOCUS)
-@Reference(window = @Window(start = -1 * MuTect.REFERENCE_HALF_WINDOW_LENGTH, stop = MuTect.REFERENCE_HALF_WINDOW_LENGTH))
+@Reference(window=@Window(start=-1* MuTect.REFERENCE_HALF_WINDOW_LENGTH,stop= MuTect.REFERENCE_HALF_WINDOW_LENGTH))
+@By(DataSource.REFERENCE)
 public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducible<Integer> {
     public static final int REFERENCE_HALF_WINDOW_LENGTH = 150;
     public static final String BAM_TAG_TUMOR = "tumor";
     public static final String BAM_TAG_NORMAL = "normal";
 
-    @ArgumentCollection
-    private MuTectArgumentCollection MTAC = new MuTectArgumentCollection();
+
+    @ArgumentCollection private MuTectArgumentCollection MTAC = new MuTectArgumentCollection();
 
     /***************************************/
     // Call-stats output
     /***************************************/
-    @Output(doc = "Call-stats output")
+    @Output(doc="Call-stats output")
     PrintStream out;
 
-    @Output(doc = "VCF output of mutation candidates", shortName = "vcf", fullName = "vcf", required = false)
+    @Output(doc="VCF output of mutation candidates",shortName="vcf", fullName="vcf", required=false)
     protected VariantContextWriter vcf = null;
 
     /***************************************/
     // Reference Metadata inputs
     /***************************************/
-    @Input(fullName = "dbsnp", shortName = "dbsnp", doc = "VCF file of DBSNP information", required = false)
+    @Input(fullName="dbsnp", shortName = "dbsnp", doc="VCF file of DBSNP information", required=false)
     public List<RodBinding<VariantContext>> dbsnpRod = Collections.emptyList();
 
-    @Input(fullName = "cosmic", shortName = "cosmic", doc = "VCF file of COSMIC sites", required = false)
+    @Input(fullName="cosmic", shortName = "cosmic", doc="VCF file of COSMIC sites", required=false)
     public List<RodBinding<VariantContext>> cosmicRod = Collections.emptyList();
 
-    @Input(fullName = "normal_panel", shortName = "normal_panel", doc = "VCF file of sites observed in normal", required = false)
+    @Input(fullName="normal_panel", shortName = "normal_panel", doc="VCF file of sites observed in normal", required=false)
     public List<RodBinding<VariantContext>> normalPanelRod = Collections.emptyList();
 
     /***************************************/
     // coverage outputs
     /***************************************/
-    @Output(fullName = "coverage_file", shortName = "cov", doc = "write out coverage in WIGGLE format to this file", required = false, defaultToStdout = false)
+    @Output(fullName="coverage_file", shortName="cov", doc="write out coverage in WIGGLE format to this file", required=false, defaultToStdout=false)
     public PrintStream COVERAGE_FILE = null;
 
-    @Output(fullName = "coverage_20_q20_file", shortName = "cov_q20", doc = "write out 20x of Q20 coverage in WIGGLE format to this file", required = false, defaultToStdout = false)
+    @Output(fullName="coverage_20_q20_file", shortName="cov_q20", doc="write out 20x of Q20 coverage in WIGGLE format to this file", required=false, defaultToStdout=false)
     public PrintStream COVERAGE_20_Q20_FILE = null;
 
-    @Output(fullName = "power_file", shortName = "pow", doc = "write out power in WIGGLE format to this file", required = false, defaultToStdout = false)
+    @Output(fullName="power_file", shortName="pow", doc="write out power in WIGGLE format to this file", required=false, defaultToStdout=false)
     public PrintStream POWER_FILE = null;
 
-    @Output(fullName = "tumor_depth_file", shortName = "tdf", doc = "write out tumor read depth in WIGGLE format to this file", required = false, defaultToStdout = false)
+    @Output(fullName="tumor_depth_file", shortName="tdf", doc="write out tumor read depth in WIGGLE format to this file", required=false, defaultToStdout=false)
     public PrintStream TUMOR_DEPTH_FILE = null;
 
-    @Output(fullName = "normal_depth_file", shortName = "ndf", doc = "write out normal read depth in WIGGLE format to this file", required = false, defaultToStdout = false)
+    @Output(fullName="normal_depth_file", shortName="ndf", doc="write out normal read depth in WIGGLE format to this file", required=false, defaultToStdout=false)
     public PrintStream NORMAL_DEPTH_FILE = null;
 
     public int MIN_QSUM_QSCORE = 13;
@@ -154,17 +140,24 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
     private TumorPowerCalculator strandArtifactPowerCalculator;
 
     private static class PileupComparatorByQual implements Comparator<PileupElement> {
+       
+
+        
+
+        
 	
 	public int compare(PileupElement o1, PileupElement o2) {
 	    return o1.getQual() - o2.getQual();
-	}
+        }
     }
+
 
     private CoverageWiggleFileWriter stdCovWriter;
     private CoverageWiggleFileWriter q20CovWriter;
     private CoverageWiggleFileWriter powerWriter;
     private CoverageWiggleFileWriter tumorDepthWriter;
     private CoverageWiggleFileWriter normalDepthWriter;
+
 
     private Set<SAMReaderID> tumorSAMReaderIDs = new HashSet<SAMReaderID>();
     private Set<SAMReaderID> normalSAMReaderIDs = new HashSet<SAMReaderID>();
@@ -173,124 +166,117 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
 
     @Override
     public boolean includeReadsWithDeletionAtLoci() {
-	return true;
+        return true;
     }
 
     @Override
     public void initialize() {
-	if (MTAC.NOOP) {
-	    return;
-	}
-	// setting version info
-	final String gatkVersion = CommandLineGATK.getVersionNumber();
-	ResourceBundle resources = TextFormattingUtils.loadResourceBundle("CGAText");
-	final String mutectVersion = resources.containsKey("version") ? resources.getString("version") : "<unknown>";
-	final String combinedVersion = "MuTect:" + mutectVersion + " Gatk:" + gatkVersion;
+        if (MTAC.NOOP) {
+            return;
+        }
+        //setting version info
+        final String gatkVersion = CommandLineGATK.getVersionNumber();
+        ResourceBundle resources = TextFormattingUtils.loadResourceBundle("CGAText");
+        final String mutectVersion = resources.containsKey("version")? resources.getString("version") : "<unknown>";        
+        final String combinedVersion = "MuTect:"+mutectVersion+" Gatk:"+gatkVersion;
 
-	logger.info("VERSION INFO: " + combinedVersion);
+        logger.info("VERSION INFO: " + combinedVersion);
 
-	refReader = this.getToolkit().getReferenceDataSource().getReference();
-	callStatsGenerator = new CallStatsGenerator(MTAC.ENABLE_QSCORE_OUTPUT);
+        refReader = this.getToolkit().getReferenceDataSource().getReference();
+        callStatsGenerator = new CallStatsGenerator(MTAC.ENABLE_QSCORE_OUTPUT);
 
-	// check that we have at least one tumor bam
-	for (SAMReaderID id : getToolkit().getReadsDataSource().getReaderIDs()) {
-	    if (id.getTags().getPositionalTags().size() == 0) {
-		throw new RuntimeException("BAMs must be tagged as either 'tumor' or 'normal'");
-	    }
+        // check that we have at least one tumor bam
+        for(SAMReaderID id : getToolkit().getReadsDataSource().getReaderIDs()) {
+            if (id.getTags().getPositionalTags().size() == 0) {
+                throw new RuntimeException("BAMs must be tagged as either 'tumor' or 'normal'");
+            }
 
-	    for (String tag : id.getTags().getPositionalTags()) {
-		if (BAM_TAG_TUMOR.equalsIgnoreCase(tag)) {
-		    hasTumorBam = true;
-		    tumorSAMReaderIDs.add(id);
+            for(String tag : id.getTags().getPositionalTags()) {
+                if (BAM_TAG_TUMOR.equalsIgnoreCase(tag)) {
+                    hasTumorBam = true;
+                    tumorSAMReaderIDs.add(id);
 
-		    // fill in the sample name if necessary
-		    if (MTAC.TUMOR_SAMPLE_NAME == null) {
-			try {
-			    if (getToolkit().getReadsDataSource().getHeader(id).getReadGroups().size() == 0) {
-				throw new RuntimeException(
-					"No Read Groups found for Tumor BAM -- Read Groups are Required, or supply tumor_sample_name!");
-			    }
-			    MTAC.TUMOR_SAMPLE_NAME = getToolkit().getReadsDataSource().getHeader(id).getReadGroups()
-				    .get(0).getSample();
-			} catch (NullPointerException npe) {
-			    MTAC.TUMOR_SAMPLE_NAME = "tumor";
-			}
-		    }
-		} else if (BAM_TAG_NORMAL.equalsIgnoreCase(tag)) {
-		    hasNormalBam = true;
-		    normalSAMReaderIDs.add(id);
+                    // fill in the sample name if necessary
+                    if (MTAC.TUMOR_SAMPLE_NAME == null) {
+                        try {
+                            if (getToolkit().getReadsDataSource().getHeader(id).getReadGroups().size() == 0) {
+                                throw new RuntimeException("No Read Groups found for Tumor BAM -- Read Groups are Required, or supply tumor_sample_name!");
+                            }
+                            MTAC.TUMOR_SAMPLE_NAME = getToolkit().getReadsDataSource().getHeader(id).getReadGroups().get(0).getSample();
+                        } catch (NullPointerException npe) {
+                            MTAC.TUMOR_SAMPLE_NAME = "tumor";
+                        }
+                    }
+                } else if (BAM_TAG_NORMAL.equalsIgnoreCase(tag)) {
+                    hasNormalBam = true;
+                    normalSAMReaderIDs.add(id);
 
-		    // fill in the sample name if necessary
-		    if (MTAC.NORMAL_SAMPLE_NAME == null) {
-			try {
-			    if (getToolkit().getReadsDataSource().getHeader(id).getReadGroups().size() == 0) {
-				throw new RuntimeException(
-					"No Read Groups found for Normal BAM -- Read Groups are Required, or supply normal_sample_name!");
-			    }
 
-			    MTAC.NORMAL_SAMPLE_NAME = getToolkit().getReadsDataSource().getHeader(id).getReadGroups()
-				    .get(0).getSample();
-			} catch (NullPointerException npe) {
-			    MTAC.NORMAL_SAMPLE_NAME = "normal";
-			}
-		    }
-		} else {
-		    throw new RuntimeException("Unknown BAM tag '" + tag + "' must be either 'tumor' or 'normal'");
-		}
-	    }
-	}
+                    // fill in the sample name if necessary
+                    if (MTAC.NORMAL_SAMPLE_NAME == null) {
+                        try {
+                            if (getToolkit().getReadsDataSource().getHeader(id).getReadGroups().size() == 0) {
+                                throw new RuntimeException("No Read Groups found for Normal BAM -- Read Groups are Required, or supply normal_sample_name!");
+                            }
 
-	if (!hasTumorBam) {
-	    throw new RuntimeException("At least one BAM tagged as 'tumor' required");
-	}
+                            MTAC.NORMAL_SAMPLE_NAME = getToolkit().getReadsDataSource().getHeader(id).getReadGroups().get(0).getSample();
+                        } catch (NullPointerException npe) {
+                            MTAC.NORMAL_SAMPLE_NAME = "normal";
+                        }
+                    }
+                } else {
+                    throw new RuntimeException("Unknown BAM tag '" + tag + "' must be either 'tumor' or 'normal'");
+                }
+            }
+        }
 
-	if (!hasNormalBam) {
-	    MTAC.NORMAL_LOD_THRESHOLD = -1 * Float.MAX_VALUE;
-	    MTAC.NORMAL_DBSNP_LOD_THRESHOLD = -1 * Float.MAX_VALUE;
-	    MTAC.NORMAL_ARTIFACT_LOD_THRESHOLD = Float.MAX_VALUE;
-	    MTAC.NORMAL_SAMPLE_NAME = "none";
-	}
+        if (!hasTumorBam) {
+            throw new RuntimeException("At least one BAM tagged as 'tumor' required");
+        }
 
-	this.contaminantAlternateFraction = Math.max(MTAC.MINIMUM_MUTATION_CELL_FRACTION, MTAC.FRACTION_CONTAMINATION);
+        if (!hasNormalBam) {
+            MTAC.NORMAL_LOD_THRESHOLD = -1 * Float.MAX_VALUE;
+            MTAC.NORMAL_DBSNP_LOD_THRESHOLD = -1 * Float.MAX_VALUE;
+            MTAC.NORMAL_ARTIFACT_LOD_THRESHOLD = Float.MAX_VALUE;
+            MTAC.NORMAL_SAMPLE_NAME = "none";
+        }
 
-	// coverage related initialization
-	double powerConstantEps = Math.pow(10, -1 * (MTAC.POWER_CONSTANT_QSCORE / 10));
+        this.contaminantAlternateFraction = Math.max(MTAC.MINIMUM_MUTATION_CELL_FRACTION, MTAC.FRACTION_CONTAMINATION);
 
-	this.tumorPowerCalculator = new TumorPowerCalculator(powerConstantEps, MTAC.TUMOR_LOD_THRESHOLD,
-		this.contaminantAlternateFraction);
-	this.normalNovelSitePowerCalculator = new NormalPowerCalculator(powerConstantEps, MTAC.NORMAL_LOD_THRESHOLD);
-	this.normalDbSNPSitePowerCalculator = new NormalPowerCalculator(powerConstantEps,
-		MTAC.NORMAL_DBSNP_LOD_THRESHOLD);
-	this.strandArtifactPowerCalculator = new TumorPowerCalculator(powerConstantEps,
-		MTAC.STRAND_ARTIFACT_LOD_THRESHOLD, 0.0f);
+        // coverage related initialization
+        double powerConstantEps = Math.pow(10, -1 * (MTAC.POWER_CONSTANT_QSCORE/10));
 
-	stdCovWriter = new CoverageWiggleFileWriter(COVERAGE_FILE);
-	q20CovWriter = new CoverageWiggleFileWriter(COVERAGE_20_Q20_FILE);
-	powerWriter = new CoverageWiggleFileWriter(POWER_FILE);
-	tumorDepthWriter = new CoverageWiggleFileWriter(TUMOR_DEPTH_FILE);
-	normalDepthWriter = new CoverageWiggleFileWriter(NORMAL_DEPTH_FILE);
+        this.tumorPowerCalculator = new TumorPowerCalculator(powerConstantEps, MTAC.TUMOR_LOD_THRESHOLD, this.contaminantAlternateFraction);
+        this.normalNovelSitePowerCalculator = new NormalPowerCalculator(powerConstantEps, MTAC.NORMAL_LOD_THRESHOLD);
+        this.normalDbSNPSitePowerCalculator = new NormalPowerCalculator(powerConstantEps, MTAC.NORMAL_DBSNP_LOD_THRESHOLD);
+        this.strandArtifactPowerCalculator = new TumorPowerCalculator(powerConstantEps, MTAC.STRAND_ARTIFACT_LOD_THRESHOLD, 0.0f);
 
-	// to force output, all we have to do is lower the initial tumor lod
-	// threshold to -infinity
-	if (MTAC.FORCE_OUTPUT) {
-	    MTAC.INITIAL_TUMOR_LOD_THRESHOLD = -Float.MAX_VALUE;
-	}
+        stdCovWriter = new CoverageWiggleFileWriter(COVERAGE_FILE);
+        q20CovWriter = new CoverageWiggleFileWriter(COVERAGE_20_Q20_FILE);
+        powerWriter = new CoverageWiggleFileWriter(POWER_FILE);
+        tumorDepthWriter = new CoverageWiggleFileWriter(TUMOR_DEPTH_FILE);
+        normalDepthWriter = new CoverageWiggleFileWriter(NORMAL_DEPTH_FILE);
 
-	// initialize the call-stats file
-	// out.println("## muTect v1.0." + VERSION.split(" ")[1]);
-	out.println("##" + combinedVersion);
-	out.println(callStatsGenerator.generateHeader());
+        // to force output, all we have to do is lower the initial tumor lod threshold to -infinity
+        if (MTAC.FORCE_OUTPUT) {
+            MTAC.INITIAL_TUMOR_LOD_THRESHOLD = -Float.MAX_VALUE;
+        }
 
-	// initialize the VCF output
-	if (vcf != null) {
-	    Set<String> samples = new HashSet<String>();
-	    samples.add(MTAC.TUMOR_SAMPLE_NAME);
-	    samples.add(MTAC.NORMAL_SAMPLE_NAME);
-	    Set<VCFHeaderLine> headerInfo = VCFGenerator.getVCFHeaderInfo();
-	    vcf.writeHeader(new VCFHeader(headerInfo, samples));
-	}
+        // initialize the call-stats file
+        //out.println("## muTect v1.0." + VERSION.split(" ")[1]);
+        out.println("##"+combinedVersion);
+        out.println(callStatsGenerator.generateHeader());
 
-	lastTime = System.currentTimeMillis();
+        // initialize the VCF output
+        if (vcf != null) {
+            Set<String> samples = new HashSet<String>();
+            samples.add(MTAC.TUMOR_SAMPLE_NAME);
+            samples.add(MTAC.NORMAL_SAMPLE_NAME);
+            Set<VCFHeaderLine> headerInfo = VCFGenerator.getVCFHeaderInfo();
+            vcf.writeHeader(new VCFHeader(headerInfo, samples));
+        }
+
+        lastTime = System.currentTimeMillis();
     }
 
     public static int MAX_INSERT_SIZE = 10000;
@@ -301,206 +287,194 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
 
     @Override
     public Integer map(final RefMetaDataTracker tracker, final ReferenceContext ref, final AlignmentContext rawContext) {
-	if (MTAC.NOOP)
-	    return 0;
+        if (MTAC.NOOP) return 0;
 
-	TreeMap<Double, CandidateMutation> messageByTumorLod = new TreeMap<Double, CandidateMutation>();
+        TreeMap<Double, CandidateMutation> messageByTumorLod = new TreeMap<Double, CandidateMutation>();
 
-	ReadBackedPileup pileup = rawContext.getBasePileup();
-	int numberOfReads = pileup.depthOfCoverage();
-	binReadsProcessed += numberOfReads;
+        ReadBackedPileup pileup = rawContext.getBasePileup();
+        int numberOfReads = pileup.depthOfCoverage();
+        binReadsProcessed += numberOfReads;
 
-	if (binReadsProcessed >= 1000000) {
-	    long time = System.currentTimeMillis();
-	    long elapsedTime = time - lastTime;
-	    lastTime = time;
+        if (binReadsProcessed >= 1000000) {
+            long time = System.currentTimeMillis();
+            long elapsedTime = time - lastTime;
+            lastTime = time;
 
-	    totalReadsProcessed += binReadsProcessed;
-	    binReadsProcessed = 0;
+            totalReadsProcessed += binReadsProcessed;
+            binReadsProcessed = 0;
 
-	    logger.info(String.format("[MUTECT] Processed %d reads in %d ms", totalReadsProcessed, elapsedTime));
-	}
+            logger.info(String.format("[MUTECT] Processed %d reads in %d ms", totalReadsProcessed, elapsedTime));
+        }
 
-	// an optimization to speed things up when there is no coverage
-	if (!MTAC.FORCE_OUTPUT && numberOfReads == 0) {
-	    return -1;
-	}
+        // an optimization to speed things up when there is no coverage
+        if ( !MTAC.FORCE_OUTPUT && numberOfReads == 0) { return -1; }
 
-	final char upRef = Character.toUpperCase(ref.getBaseAsChar());
-	String sequenceContext = SequenceUtils.createSequenceContext(ref, 3);
+        final char upRef = Character.toUpperCase(ref.getBaseAsChar());
+        String sequenceContext = SequenceUtils.createSequenceContext(ref, 3);
 
-	try {
+        try {
 
-	    // only process bases where the reference is [ACGT], because the
-	    // FASTA for HG18 has N,M and R!
-	    if (upRef != 'A' && upRef != 'C' && upRef != 'G' && upRef != 'T') {
-		return -1;
-	    }
 
-	    ArrayList<PileupElement> tumorPileupElements = new ArrayList<PileupElement>();
-	    ArrayList<PileupElement> normalPileupElements = new ArrayList<PileupElement>();
+            // only process bases where the reference is [ACGT], because the FASTA for HG18 has N,M and R!
+            if (upRef != 'A' && upRef != 'C' && upRef != 'G' && upRef != 'T') {
+                return -1;
+            }
 
-	    int totalPairs = 0;
-	    int improperPairs = 0;
-	    for (PileupElement p : pileup) {
-		final GATKSAMRecord read = p.getRead();
-		final byte base = p.getBase();
+            ArrayList<PileupElement> tumorPileupElements = new ArrayList<PileupElement>();
+            ArrayList<PileupElement> normalPileupElements = new ArrayList<PileupElement>();
 
-		if (base == ((byte) 'N') || base == ((byte) 'n')) {
-		    continue;
-		}
+            int totalPairs = 0;
+            int improperPairs = 0;
+            for (PileupElement p : pileup ) {
+                final GATKSAMRecord read = p.getRead();
+                final byte base = p.getBase();
 
-		// count # of reads that are part of a mapped pair where the
-		// 'proper pair'
-		// flag is false or the insert size is > 10kb
-		if (read.getReadPairedFlag() && !read.getMateUnmappedFlag()) {
-		    totalPairs++;
-		    if (!read.getProperPairFlag() || read.getInferredInsertSize() >= MAX_INSERT_SIZE) {
-			improperPairs++;
-		    }
-		}
+                if (base == ((byte)'N') || base == ((byte)'n')) {
+                    continue;
+                }
 
-		// Add the read to the appropriate pile of reads
-		ReadSource source = getReadSource(p.getRead());
-		if (source == ReadSource.Tumor) {
-		    tumorPileupElements.add(p);
-		} else if (source == ReadSource.Normal) {
-		    normalPileupElements.add(p);
-		}
-	    }
+                // count # of reads that are part of a mapped pair where the 'proper pair'
+                // flag is false or the insert size is > 10kb
+                if (read.getReadPairedFlag() && !read.getMateUnmappedFlag()) {
+                    totalPairs++;
+                    if (!read.getProperPairFlag() || read.getInferredInsertSize() >= MAX_INSERT_SIZE) {
+                        improperPairs++;
+                    }
+                }
 
-	    ReadBackedPileup normalPileup = new ReadBackedPileupImpl(rawContext.getLocation(), normalPileupElements);
 
-	    ReadBackedPileup tumorPileup = new ReadBackedPileupImpl(rawContext.getLocation(), tumorPileupElements);
+                // Add the read to the appropriate pile of reads
+                ReadSource source = getReadSource(p.getRead());
+                if (source == ReadSource.Tumor) {
+                    tumorPileupElements.add(p);
+                } else if (source == ReadSource.Normal) {
+                    normalPileupElements.add(p);
+                }
+            }
 
-	    if (MTAC.BAM_TUMOR_SAMPLE_NAME != null) {
-		tumorPileup = tumorPileup.getPileupForSample(MTAC.BAM_TUMOR_SAMPLE_NAME);
-	    }
+            ReadBackedPileup normalPileup =
+                    new ReadBackedPileupImpl(rawContext.getLocation(), normalPileupElements);
 
-	    final LocusReadPile tumorReadPile = new LocusReadPile(tumorPileup, upRef, MTAC.MIN_QSCORE, MIN_QSUM_QSCORE,
-		    false, MTAC.ARTIFACT_DETECTION_MODE, MTAC.ENABLE_QSCORE_OUTPUT);
-	    final LocusReadPile normalReadPile = new LocusReadPile(normalPileup, upRef, MTAC.MIN_QSCORE, 0,
-		    this.USE_MAPQ0_IN_NORMAL_QSCORE, true, MTAC.ENABLE_QSCORE_OUTPUT);
+            ReadBackedPileup tumorPileup =
+                    new ReadBackedPileupImpl(rawContext.getLocation(), tumorPileupElements);
 
-	    Collection<VariantContext> panelOfNormalsVC = tracker.getValues(normalPanelRod, rawContext.getLocation());
-	    Collection<VariantContext> cosmicVC = tracker.getValues(cosmicRod, rawContext.getLocation());
-	    Collection<VariantContext> dbsnpVC = tracker.getValues(dbsnpRod, rawContext.getLocation());
+            if (MTAC.BAM_TUMOR_SAMPLE_NAME != null) {
+                tumorPileup = tumorPileup.getPileupForSample(MTAC.BAM_TUMOR_SAMPLE_NAME);
+            }
 
-	    // remove the effect of cosmic from dbSNP
-	    boolean germlineAtRisk = (!dbsnpVC.isEmpty() && cosmicVC.isEmpty());
+            final LocusReadPile tumorReadPile = new LocusReadPile(tumorPileup, upRef, MTAC.MIN_QSCORE, MIN_QSUM_QSCORE, false, MTAC.ARTIFACT_DETECTION_MODE, MTAC.ENABLE_QSCORE_OUTPUT);
+            final LocusReadPile normalReadPile = new LocusReadPile(normalPileup, upRef, MTAC.MIN_QSCORE, 0, this.USE_MAPQ0_IN_NORMAL_QSCORE, true, MTAC.ENABLE_QSCORE_OUTPUT);
 
-	    // compute coverage flags
-	    int tumorCoveredDepthThreshold = 14;
-	    int normalCoveredDepthThreshold = (germlineAtRisk) ? 19 : 8;
-	    if (!hasNormalBam) {
-		normalCoveredDepthThreshold = 0;
-	    }
 
-	    int tumorBaseCount = tumorReadPile.finalPileupReads.size();
-	    int normalBaseCount = normalReadPile.finalPileupReads.size();
-	    boolean isTumorCovered = tumorBaseCount >= tumorCoveredDepthThreshold;
-	    boolean isNormalCovered = normalBaseCount >= normalCoveredDepthThreshold;
-	    boolean isBaseCovered = isTumorCovered && isNormalCovered;
-	    if (!hasNormalBam) {
-		isBaseCovered = isTumorCovered;
-	    }
+            Collection<VariantContext> panelOfNormalsVC = tracker.getValues(normalPanelRod, rawContext.getLocation());
+            Collection<VariantContext> cosmicVC = tracker.getValues(cosmicRod, rawContext.getLocation());
+            Collection<VariantContext> dbsnpVC = tracker.getValues(dbsnpRod, rawContext.getLocation());
 
-	    stdCovWriter.writeCoverage(rawContext, isBaseCovered);
-	    int tumorQ20BaseCount = tumorReadPile.getFilteredBaseCount(20);
-	    int normalQ20BaseCount = normalReadPile.getFilteredBaseCount(20);
-	    q20CovWriter.writeCoverage(rawContext, tumorQ20BaseCount >= 20 && normalQ20BaseCount >= 20);
-	    tumorDepthWriter.writeCoverage(rawContext, tumorBaseCount);
-	    normalDepthWriter.writeCoverage(rawContext, normalBaseCount);
+            // remove the effect of cosmic from dbSNP
+            boolean germlineAtRisk = (!dbsnpVC.isEmpty() && cosmicVC.isEmpty());
 
-	    // calculate power
-	    double tumorPower = tumorPowerCalculator.cachingPowerCalculation(tumorBaseCount, MTAC.POWER_CONSTANT_AF);
+            // compute coverage flags
+            int tumorCoveredDepthThreshold = 14;
+            int normalCoveredDepthThreshold = (germlineAtRisk)?19:8;
+            if (!hasNormalBam) {
+                normalCoveredDepthThreshold = 0;
+            }
 
-	    double normalPowerNoSNPPrior = normalNovelSitePowerCalculator.cachingPowerCalculation(normalBaseCount);
-	    double normalPowerWithSNPPrior = normalDbSNPSitePowerCalculator.cachingPowerCalculation(normalBaseCount);
+            int tumorBaseCount = tumorReadPile.finalPileupReads.size();
+            int normalBaseCount = normalReadPile.finalPileupReads.size();
+            boolean isTumorCovered = tumorBaseCount >= tumorCoveredDepthThreshold;
+            boolean isNormalCovered = normalBaseCount >= normalCoveredDepthThreshold;
+            boolean isBaseCovered = isTumorCovered && isNormalCovered;
+            if (!hasNormalBam) {
+                isBaseCovered = isTumorCovered;
+            }
 
-	    double normalPower = (germlineAtRisk) ? normalPowerWithSNPPrior : normalPowerNoSNPPrior;
+            stdCovWriter.writeCoverage(rawContext, isBaseCovered);
+            int tumorQ20BaseCount = tumorReadPile.getFilteredBaseCount(20);
+            int normalQ20BaseCount = normalReadPile.getFilteredBaseCount(20);
+            q20CovWriter.writeCoverage(rawContext, tumorQ20BaseCount  >= 20 &&  normalQ20BaseCount >= 20);
+            tumorDepthWriter.writeCoverage(rawContext, tumorBaseCount);
+            normalDepthWriter.writeCoverage(rawContext, normalBaseCount);
 
-	    double combinedPower = tumorPower * normalPower;
-	    if (!hasNormalBam) {
-		combinedPower = tumorPower;
-	    }
+            // calculate power
+            double tumorPower = tumorPowerCalculator.cachingPowerCalculation(tumorBaseCount, MTAC.POWER_CONSTANT_AF);
 
-	    powerWriter.writeCoverage(rawContext, combinedPower);
+            double normalPowerNoSNPPrior = normalNovelSitePowerCalculator.cachingPowerCalculation(normalBaseCount);
+            double normalPowerWithSNPPrior = normalDbSNPSitePowerCalculator.cachingPowerCalculation(normalBaseCount);
 
-	    int mapQ0Reads = tumorReadPile.qualityScoreFilteredPileup.getNumberOfMappingQualityZeroReads()
-		    + normalReadPile.qualityScoreFilteredPileup.getNumberOfMappingQualityZeroReads();
+            double normalPower = (germlineAtRisk)?normalPowerWithSNPPrior:normalPowerNoSNPPrior;
 
-	    // Test each of the possible alternate alleles
-	    for (final char altAllele : new char[] { 'A', 'C', 'G', 'T' }) {
-		if (altAllele == upRef) {
-		    continue;
-		}
-		if (!MTAC.FORCE_OUTPUT && tumorReadPile.qualitySums.getCounts(altAllele) == 0) {
-		    continue;
-		}
+            double combinedPower = tumorPower*normalPower;
+            if (!hasNormalBam) {
+                combinedPower = tumorPower;
+            }
 
-		CandidateMutation candidate = new CandidateMutation(rawContext.getLocation(), upRef);
-		candidate.setSequenceContext(sequenceContext);
-		candidate.setTumorSampleName(MTAC.TUMOR_SAMPLE_NAME);
-		candidate.setNormalSampleName(MTAC.NORMAL_SAMPLE_NAME);
-		candidate.setCovered(isBaseCovered);
-		candidate.setPower(combinedPower);
-		candidate.setTumorPower(tumorPower);
-		candidate.setNormalPower(normalPower);
-		candidate.setNormalPowerWithSNPPrior(normalPowerWithSNPPrior);
-		candidate.setNormalPowerNoSNPPrior(normalPowerNoSNPPrior);
-		candidate.setTumorQ20Count(tumorQ20BaseCount);
-		candidate.setNormalQ20Count(normalQ20BaseCount);
-		candidate.setInitialTumorNonRefQualitySum(tumorReadPile.qualitySums.getOtherQualities(upRef));
-		candidate.setAltAllele(altAllele);
-		candidate.setTotalPairs(totalPairs);
-		candidate.setImproperPairs(improperPairs);
-		candidate.setMapQ0Reads(mapQ0Reads);
-		candidate.setContaminationFraction(MTAC.FRACTION_CONTAMINATION);
-		candidate.setPanelOfNormalsVC(panelOfNormalsVC.isEmpty() ? null : panelOfNormalsVC.iterator().next()); // if
-														       // there
-														       // are
-														       // multiple,
-														       // we're
-														       // just
-														       // grabbing
-														       // the
-														       // first
-		candidate.setCosmicSite(!cosmicVC.isEmpty());
-		candidate.setDbsnpSite(!dbsnpVC.isEmpty());
-		candidate.setDbsnpVC(dbsnpVC.isEmpty() ? null : dbsnpVC.iterator().next());
-		candidate.setTumorF(tumorReadPile.estimateAlleleFraction(upRef, altAllele));
+            powerWriter.writeCoverage(rawContext, combinedPower);
 
-		if (!MTAC.FORCE_OUTPUT && candidate.getTumorF() < MTAC.TUMOR_F_PRETEST) {
-		    continue;
-		}
+            int mapQ0Reads =
+                    tumorReadPile.qualityScoreFilteredPileup.getNumberOfMappingQualityZeroReads() +
+                            normalReadPile.qualityScoreFilteredPileup.getNumberOfMappingQualityZeroReads();
 
-		if (++candidatesInspected % 1000 == 0) {
-		    logger.info(String.format("[MUTECT] Inspected %d potential candidates", candidatesInspected));
-		}
 
-		candidate.setInitialTumorAltCounts(tumorReadPile.qualitySums.getCounts(altAllele));
-		candidate.setInitialTumorRefCounts(tumorReadPile.qualitySums.getCounts(upRef));
-		candidate.setInitialTumorAltQualitySum(tumorReadPile.qualitySums.getQualitySum(altAllele));
-		candidate.setInitialTumorRefQualitySum(tumorReadPile.qualitySums.getQualitySum(upRef));
+            // Test each of the possible alternate alleles
+            for (final char altAllele : new char[]{'A','C','G','T'}) {
+                if (altAllele == upRef) { continue; }
+                if (!MTAC.FORCE_OUTPUT && tumorReadPile.qualitySums.getCounts(altAllele) == 0) { continue; }
 
-		double tumorLod = tumorReadPile.calculateAltVsRefLOD((byte) altAllele, candidate.getTumorF(), 0);
-		candidate.setTumorLodFStar(tumorLod);
+                CandidateMutation candidate = new CandidateMutation(rawContext.getLocation(), upRef);
+                candidate.setSequenceContext(sequenceContext);
+                candidate.setTumorSampleName(MTAC.TUMOR_SAMPLE_NAME);
+                candidate.setNormalSampleName(MTAC.NORMAL_SAMPLE_NAME);
+                candidate.setCovered(isBaseCovered);
+                candidate.setPower(combinedPower);
+                candidate.setTumorPower(tumorPower);
+                candidate.setNormalPower(normalPower);
+                candidate.setNormalPowerWithSNPPrior(normalPowerWithSNPPrior);
+                candidate.setNormalPowerNoSNPPrior(normalPowerNoSNPPrior);
+                candidate.setTumorQ20Count(tumorQ20BaseCount);
+                candidate.setNormalQ20Count(normalQ20BaseCount);
+                candidate.setInitialTumorNonRefQualitySum(tumorReadPile.qualitySums.getOtherQualities(upRef));
+                candidate.setAltAllele(altAllele);
+                candidate.setTotalPairs(totalPairs);
+                candidate.setImproperPairs(improperPairs);
+                candidate.setMapQ0Reads(mapQ0Reads);
+                candidate.setContaminationFraction(MTAC.FRACTION_CONTAMINATION);
+                candidate.setPanelOfNormalsVC(panelOfNormalsVC.isEmpty()?null:panelOfNormalsVC.iterator().next()); // if there are multiple, we're just grabbing the first
+                candidate.setCosmicSite(!cosmicVC.isEmpty());
+                candidate.setDbsnpSite(!dbsnpVC.isEmpty());
+                candidate.setDbsnpVC(dbsnpVC.isEmpty()?null:dbsnpVC.iterator().next());
+                candidate.setTumorF(tumorReadPile.estimateAlleleFraction(upRef, altAllele));
 
-		candidate.setInitialTumorReadDepth(tumorReadPile.finalPileupReads.size());
-		candidate.setTumorInsertionCount(tumorReadPile.getInsertionsCount());
-		candidate.setTumorDeletionCount(tumorReadPile.getDeletionsCount());
+                if (!MTAC.FORCE_OUTPUT && candidate.getTumorF() < MTAC.TUMOR_F_PRETEST) {
+                    continue;
+                }
 
-		if (candidate.getTumorLodFStar() < MTAC.INITIAL_TUMOR_LOD_THRESHOLD) {
-		    continue;
-		}
+                if (++candidatesInspected % 1000 == 0) {
+                    logger.info(String.format("[MUTECT] Inspected %d potential candidates", candidatesInspected));
+                }
 
-		// calculate lod of contaminant
-		double contaminantF = Math.min(contaminantAlternateFraction, candidate.getTumorF());
-		VariableAllelicRatioGenotypeLikelihoods contaminantLikelihoods = new VariableAllelicRatioGenotypeLikelihoods(
-			upRef, contaminantF);
+                candidate.setInitialTumorAltCounts(tumorReadPile.qualitySums.getCounts(altAllele));
+                candidate.setInitialTumorRefCounts(tumorReadPile.qualitySums.getCounts(upRef));
+                candidate.setInitialTumorAltQualitySum(tumorReadPile.qualitySums.getQualitySum(altAllele));
+                candidate.setInitialTumorRefQualitySum(tumorReadPile.qualitySums.getQualitySum(upRef));
 
-		List<PileupElement> refList = new ArrayList<PileupElement>();
+                double tumorLod = tumorReadPile.calculateAltVsRefLOD((byte)altAllele, candidate.getTumorF(), 0);
+                candidate.setTumorLodFStar(tumorLod);
+
+                candidate.setInitialTumorReadDepth(tumorReadPile.finalPileupReads.size());
+                candidate.setTumorInsertionCount(tumorReadPile.getInsertionsCount());
+                candidate.setTumorDeletionCount(tumorReadPile.getDeletionsCount());
+
+                if (candidate.getTumorLodFStar() < MTAC.INITIAL_TUMOR_LOD_THRESHOLD ) {
+                    continue;
+                }
+
+                // calculate lod of contaminant
+                double contaminantF = Math.min(contaminantAlternateFraction, candidate.getTumorF());
+                VariableAllelicRatioGenotypeLikelihoods contaminantLikelihoods
+                        = new VariableAllelicRatioGenotypeLikelihoods(upRef, contaminantF);
+
+                List<PileupElement> refList = new ArrayList<PileupElement>();
 		List<PileupElement> altList = new ArrayList<PileupElement>();
 
 		for (PileupElement element : tumorReadPile.finalPileup) {
@@ -528,325 +502,315 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
 		for (PileupElement pe : refList) {
 		    contaminantLikelihoods.add((byte) upRef, pe.getQual());
 		}
-		double[] refHetHom = LocusReadPile.extractRefHetHom(contaminantLikelihoods, upRef, altAllele);
-		double contaminantLod = refHetHom[1] - refHetHom[0];
-		candidate.setContaminantLod(contaminantLod);
+                double[] refHetHom = LocusReadPile.extractRefHetHom(contaminantLikelihoods, upRef, altAllele);
+                double contaminantLod = refHetHom[1] - refHetHom[0];
+                candidate.setContaminantLod(contaminantLod);
 
-		final QualitySums normQs = normalReadPile.qualitySums;
+                final QualitySums normQs = normalReadPile.qualitySums;
 
-		VariableAllelicRatioGenotypeLikelihoods normalGl = normalReadPile
-			.calculateLikelihoods(normalReadPile.qualityScoreFilteredPileup); // use
-											  // MAPQ0
-											  // reads
-		candidate.setInitialNormalBestGenotype(normalReadPile.getBestGenotype(normalGl));
-		candidate.setInitialNormalLod(LocusReadPile.getRefVsAlt(normalGl, upRef, altAllele));
 
-		double normalF = Math.max(LocusReadPile.estimateAlleleFraction(
-			normalReadPile.qualityScoreFilteredPileup, upRef, altAllele),
-			MTAC.MINIMUM_NORMAL_ALLELE_FRACTION);
-		candidate.setNormalF(normalF);
+                VariableAllelicRatioGenotypeLikelihoods normalGl = normalReadPile.calculateLikelihoods(normalReadPile.qualityScoreFilteredPileup); // use MAPQ0 reads
+                candidate.setInitialNormalBestGenotype(normalReadPile.getBestGenotype(normalGl));
+                candidate.setInitialNormalLod(LocusReadPile.getRefVsAlt(normalGl, upRef, altAllele));
 
-		candidate.setInitialNormalAltQualitySum(normQs.getQualitySum(altAllele));
-		candidate.setInitialNormalRefQualitySum(normQs.getQualitySum(upRef));
 
-		candidate.setNormalAltQualityScores(normQs.getBaseQualityScores(altAllele));
-		candidate.setNormalRefQualityScores(normQs.getBaseQualityScores(upRef));
+                double normalF = Math.max(LocusReadPile.estimateAlleleFraction(normalReadPile.qualityScoreFilteredPileup, upRef, altAllele), MTAC.MINIMUM_NORMAL_ALLELE_FRACTION);
+                candidate.setNormalF(normalF);
 
-		candidate.setInitialNormalAltCounts(normQs.getCounts(altAllele));
-		candidate.setInitialNormalRefCounts(normQs.getCounts(upRef));
-		candidate.setInitialNormalReadDepth(normalReadPile.finalPileupReads.size());
 
-		// TODO: parameterize filtering Mate-Rescued Reads (if someone
-		// wants to disable this)
-		final LocusReadPile t2 = filterReads(ref, tumorReadPile.finalPileup, true);
+                candidate.setInitialNormalAltQualitySum(normQs.getQualitySum(altAllele));
+                candidate.setInitialNormalRefQualitySum(normQs.getQualitySum(upRef));
 
-		// if there are no reads remaining, abandon this theory
-		if (!MTAC.FORCE_OUTPUT && t2.finalPileupReads.size() == 0) {
-		    continue;
-		}
+                candidate.setNormalAltQualityScores(normQs.getBaseQualityScores(altAllele));
+                candidate.setNormalRefQualityScores(normQs.getBaseQualityScores(upRef));
 
-		candidate.setInitialTumorAltCounts(t2.qualitySums.getCounts(altAllele));
-		candidate.setInitialTumorRefCounts(t2.qualitySums.getCounts(upRef));
-		candidate.setInitialTumorAltQualitySum(t2.qualitySums.getQualitySum(altAllele));
-		candidate.setInitialTumorRefQualitySum(t2.qualitySums.getQualitySum(upRef));
+                candidate.setInitialNormalAltCounts(normQs.getCounts(altAllele));
+                candidate.setInitialNormalRefCounts(normQs.getCounts(upRef));
+                candidate.setInitialNormalReadDepth(normalReadPile.finalPileupReads.size());
 
-		candidate.setTumorAltQualityScores(t2.qualitySums.getBaseQualityScores(altAllele));
-		candidate.setTumorRefQualityScores(t2.qualitySums.getBaseQualityScores(upRef));
+                // TODO: parameterize filtering Mate-Rescued Reads (if someone wants to disable this)
+                final LocusReadPile t2 = filterReads(ref, tumorReadPile.finalPileup, true);
 
-		VariableAllelicRatioGenotypeLikelihoods t2Gl = t2.calculateLikelihoods(t2.finalPileup);
-		candidate.setInitialTumorLod(t2.getAltVsRef(t2Gl, upRef, altAllele));
-		candidate.setInitialTumorReadDepth(t2.finalPileupReads.size());
+                // if there are no reads remaining, abandon this theory
+                if ( !MTAC.FORCE_OUTPUT && t2.finalPileupReads.size() == 0) { continue; }
 
-		candidate.setTumorF(t2.estimateAlleleFraction(upRef, altAllele));
-		double tumorLod2 = t2.calculateAltVsRefLOD((byte) altAllele, candidate.getTumorF(), 0);
-		candidate.setTumorLodFStar(tumorLod2);
+                candidate.setInitialTumorAltCounts(t2.qualitySums.getCounts(altAllele));
+                candidate.setInitialTumorRefCounts(t2.qualitySums.getCounts(upRef));
+                candidate.setInitialTumorAltQualitySum(t2.qualitySums.getQualitySum(altAllele));
+                candidate.setInitialTumorRefQualitySum(t2.qualitySums.getQualitySum(upRef));
 
-		// TODO: clean up use of forward/reverse vs positive/negative
-		// (prefer the latter since GATK uses it)
-		ReadBackedPileup forwardPileup = filterReads(ref, tumorReadPile.finalPileupPositiveStrand, true).finalPileupPositiveStrand;
-		double f2forward = LocusReadPile.estimateAlleleFraction(forwardPileup, upRef, altAllele);
-		candidate.setTumorLodFStarForward(t2.calculateAltVsRefLOD(forwardPileup, (byte) altAllele, f2forward,
-			0.0));
+                candidate.setTumorAltQualityScores(t2.qualitySums.getBaseQualityScores(altAllele));
+                candidate.setTumorRefQualityScores(t2.qualitySums.getBaseQualityScores(upRef));
 
-		ReadBackedPileup reversePileup = filterReads(ref, tumorReadPile.finalPileupNegativeStrand, true).finalPileupNegativeStrand;
-		double f2reverse = LocusReadPile.estimateAlleleFraction(reversePileup, upRef, altAllele);
-		candidate.setTumorLodFStarReverse(t2.calculateAltVsRefLOD(reversePileup, (byte) altAllele, f2reverse,
-			0.0));
+                VariableAllelicRatioGenotypeLikelihoods t2Gl = t2.calculateLikelihoods(t2.finalPileup);
+                candidate.setInitialTumorLod(t2.getAltVsRef(t2Gl, upRef, altAllele));
+                candidate.setInitialTumorReadDepth(t2.finalPileupReads.size());
 
-		// calculate strand bias power
-		candidate.setPowerToDetectPositiveStrandArtifact(strandArtifactPowerCalculator.cachingPowerCalculation(
-			reversePileup.depthOfCoverage(), candidate.getTumorF()));
-		candidate.setPowerToDetectNegativeStrandArtifact(strandArtifactPowerCalculator.cachingPowerCalculation(
-			forwardPileup.depthOfCoverage(), candidate.getTumorF()));
+                candidate.setTumorF(t2.estimateAlleleFraction(upRef, altAllele));
+                double tumorLod2 = t2.calculateAltVsRefLOD((byte)altAllele, candidate.getTumorF(), 0);
+                candidate.setTumorLodFStar(tumorLod2);
 
-		ArrayList<PileupElement> mutantPileupElements = new ArrayList<PileupElement>();
-		ArrayList<PileupElement> referencePileupElements = new ArrayList<PileupElement>();
+                //TODO: clean up use of forward/reverse vs positive/negative (prefer the latter since GATK uses it)
+                ReadBackedPileup forwardPileup = filterReads(ref, tumorReadPile.finalPileupPositiveStrand, true).finalPileupPositiveStrand;
+                double f2forward = LocusReadPile.estimateAlleleFraction(forwardPileup, upRef, altAllele);
+                candidate.setTumorLodFStarForward(t2.calculateAltVsRefLOD(forwardPileup, (byte)altAllele, f2forward, 0.0));
 
-		for (PileupElement p : t2.finalPileup) {
-		    final SAMRecord read = p.getRead();
-		    final int offset = p.getOffset();
+                ReadBackedPileup reversePileup = filterReads(ref,tumorReadPile.finalPileupNegativeStrand, true).finalPileupNegativeStrand;
+                double f2reverse = LocusReadPile.estimateAlleleFraction(reversePileup, upRef, altAllele);
+                candidate.setTumorLodFStarReverse(t2.calculateAltVsRefLOD(reversePileup, (byte)altAllele, f2reverse, 0.0));
 
-		    if (read.getReadString().charAt(offset) == altAllele) {
-			mutantPileupElements.add(p);
-		    } else if (read.getReadString().charAt(offset) == upRef) {
-			referencePileupElements.add(p);
-		    } else {
-			// just drop the read...
-		    }
-		}
+                // calculate strand bias power
+                candidate.setPowerToDetectPositiveStrandArtifact(
+                        strandArtifactPowerCalculator.cachingPowerCalculation(reversePileup.depthOfCoverage(), candidate.getTumorF())
+                );
+                candidate.setPowerToDetectNegativeStrandArtifact(
+                        strandArtifactPowerCalculator.cachingPowerCalculation(forwardPileup.depthOfCoverage(), candidate.getTumorF())
+                );
 
-		ReadBackedPileup mutantPileup = new ReadBackedPileupImpl(rawContext.getLocation(), mutantPileupElements);
 
-		ReadBackedPileup referencePileup = new ReadBackedPileupImpl(rawContext.getLocation(),
-			referencePileupElements);
+                ArrayList<PileupElement> mutantPileupElements = new ArrayList<PileupElement>();
+                ArrayList<PileupElement> referencePileupElements = new ArrayList<PileupElement>();
 
-		// TODO: shouldn't this be refAllele here?
-		final LocusReadPile mutantPile = new LocusReadPile(mutantPileup, altAllele, 0, 0,
-			MTAC.ENABLE_QSCORE_OUTPUT);
-		final LocusReadPile refPile = new LocusReadPile(referencePileup, altAllele, 0, 0,
-			MTAC.ENABLE_QSCORE_OUTPUT);
 
-		// Set the maximum observed mapping quality score for the
-		// reference and alternate alleles
-		byte[] rmq = referencePileup.getMappingQuals();
-		candidate.setTumorRefMaxMapQ((rmq.length == 0) ? 0 : NumberUtils.max(rmq));
+                for (PileupElement p : t2.finalPileup) {
+                    final SAMRecord read = p.getRead();
+                    final int offset = p.getOffset();
 
-		byte[] amq = mutantPileup.getMappingQuals();
-		candidate.setTumorAltMaxMapQ((amq.length == 0) ? 0 : NumberUtils.max(amq));
+                    if (read.getReadString().charAt(offset) == altAllele) {
+                        mutantPileupElements.add(p);
+                    } else if (read.getReadString().charAt(offset) == upRef) {
+                        referencePileupElements.add(p);
+                    } else {
+                        // just drop the read...
+                    }
+                }
 
-		candidate.setStrandContingencyTable(SequenceUtils.getStrandContingencyTable(refPile, mutantPile));
+                ReadBackedPileup mutantPileup =
+                        new ReadBackedPileupImpl(rawContext.getLocation(), mutantPileupElements);
 
-		// start with just the tumor pile
-		candidate.setTumorAltForwardOffsetsInRead(SequenceUtils.getForwardOffsetsInRead(mutantPileup));
-		candidate.setTumorAltReverseOffsetsInRead(SequenceUtils.getReverseOffsetsInRead(mutantPileup));
+                ReadBackedPileup referencePileup =
+                        new ReadBackedPileupImpl(rawContext.getLocation(), referencePileupElements);
 
-		if (candidate.getTumorAltForwardOffsetsInRead().size() > 0) {
-		    double[] offsets = MuTectStats
-			    .convertIntegersToDoubles(candidate.getTumorAltForwardOffsetsInRead());
-		    double median = MuTectStats.getMedian(offsets);
-		    candidate.setTumorForwardOffsetsInReadMedian(median);
-		    candidate.setTumorForwardOffsetsInReadMad(MuTectStats.calculateMAD(offsets, median));
-		}
+                // TODO: shouldn't this be refAllele here?
+                final LocusReadPile mutantPile = new LocusReadPile(mutantPileup, altAllele, 0, 0, MTAC.ENABLE_QSCORE_OUTPUT);
+                final LocusReadPile refPile =  new LocusReadPile(referencePileup, altAllele, 0, 0, MTAC.ENABLE_QSCORE_OUTPUT);
 
-		if (candidate.getTumorAltReverseOffsetsInRead().size() > 0) {
-		    double[] offsets = MuTectStats
-			    .convertIntegersToDoubles(candidate.getTumorAltReverseOffsetsInRead());
-		    double median = MuTectStats.getMedian(offsets);
-		    candidate.setTumorReverseOffsetsInReadMedian(median);
-		    candidate.setTumorReverseOffsetsInReadMad(MuTectStats.calculateMAD(offsets, median));
-		}
+                // Set the maximum observed mapping quality score for the reference and alternate alleles
+                byte[] rmq = referencePileup.getMappingQuals();
+                candidate.setTumorRefMaxMapQ((rmq.length==0)?0:NumberUtils.max(rmq));
 
-		// test to see if the candidate should be rejected
-		performRejection(candidate);
+                byte[] amq = mutantPileup.getMappingQuals();
+                candidate.setTumorAltMaxMapQ((amq.length==0)?0:NumberUtils.max(amq));
 
-		if (MTAC.FORCE_ALLELES) {
-		    out.println(callStatsGenerator.generateCallStats(candidate));
-		} else {
-		    messageByTumorLod.put(candidate.getInitialTumorLod(), candidate);
-		}
-	    }
+                candidate.setStrandContingencyTable(SequenceUtils.getStrandContingencyTable(refPile, mutantPile));
 
-	    // if more than one site passes the tumor lod threshold for KEEP the
-	    // fail the tri_allelic Site filter
-	    int passingCandidates = 0;
-	    for (CandidateMutation c : messageByTumorLod.values()) {
-		if (c.getTumorLodFStar() >= MTAC.TUMOR_LOD_THRESHOLD) {
-		    passingCandidates++;
-		}
-	    }
+                // start with just the tumor pile
+                candidate.setTumorAltForwardOffsetsInRead(SequenceUtils.getForwardOffsetsInRead(mutantPileup));
+                candidate.setTumorAltReverseOffsetsInRead(SequenceUtils.getReverseOffsetsInRead(mutantPileup));
 
-	    if (passingCandidates > 1) {
-		for (CandidateMutation c : messageByTumorLod.values()) {
-		    c.addRejectionReason("triallelic_site");
-		}
-	    }
+                if (candidate.getTumorAltForwardOffsetsInRead().size() > 0) {
+                    double[] offsets = MuTectStats.convertIntegersToDoubles(candidate.getTumorAltForwardOffsetsInRead());
+                    double median = MuTectStats.getMedian(offsets);
+                    candidate.setTumorForwardOffsetsInReadMedian(median);
+                    candidate.setTumorForwardOffsetsInReadMad(MuTectStats.calculateMAD(offsets, median));
+                }
 
-	    // write out the call stats for the "best" candidate
-	    if (!messageByTumorLod.isEmpty()) {
-		CandidateMutation m = messageByTumorLod.lastEntry().getValue();
 
-		// only output passing calls OR rejected sites if
-		// ONLY_PASSING_CALLS is not specified
-		if (!m.isRejected() || (m.isRejected() && !MTAC.ONLY_PASSING_CALLS)) {
+                if (candidate.getTumorAltReverseOffsetsInRead().size() > 0) {
+                    double[] offsets = MuTectStats.convertIntegersToDoubles(candidate.getTumorAltReverseOffsetsInRead());
+                    double median = MuTectStats.getMedian(offsets);
+                    candidate.setTumorReverseOffsetsInReadMedian(median);
+                    candidate.setTumorReverseOffsetsInReadMad(MuTectStats.calculateMAD(offsets, median));
+                }
 
-		    out.println(callStatsGenerator.generateCallStats(m));
-		    if (vcf != null) {
-			vcf.add(VCFGenerator.generateVC(m));
-		    }
-		}
-	    }
 
-	    return -1;
-	} catch (Throwable t) {
-	    System.err.println("Error processing " + rawContext.getContig() + ":" + rawContext.getPosition());
-	    t.printStackTrace(System.err);
+                // test to see if the candidate should be rejected
+                performRejection(candidate);
 
-	    throw new RuntimeException(t);
-	}
+                if (MTAC.FORCE_ALLELES) {
+                    out.println(callStatsGenerator.generateCallStats(candidate));
+                } else {
+                    messageByTumorLod.put(candidate.getInitialTumorLod(), candidate);
+                }
+            }
+
+            // if more than one site passes the tumor lod threshold for KEEP the fail the tri_allelic Site filter
+            int passingCandidates = 0;
+            for(CandidateMutation c : messageByTumorLod.values()) {
+                if (c.getTumorLodFStar() >= MTAC.TUMOR_LOD_THRESHOLD){
+                    passingCandidates++;
+                }
+            }
+
+            if (passingCandidates > 1) {
+                for(CandidateMutation c : messageByTumorLod.values()) {
+                    c.addRejectionReason("triallelic_site");
+                }
+            }
+
+            // write out the call stats for the "best" candidate
+            if (!messageByTumorLod.isEmpty()) {
+                CandidateMutation m = messageByTumorLod.lastEntry().getValue();
+
+                // only output passing calls OR rejected sites if ONLY_PASSING_CALLS is not specified
+                if (!m.isRejected() || (m.isRejected() && !MTAC.ONLY_PASSING_CALLS)) {
+
+                    out.println(callStatsGenerator.generateCallStats(m));
+                    if (vcf != null) {
+                        vcf.add(VCFGenerator.generateVC(m));
+                    }
+                }
+            }
+
+            return -1;
+        } catch (Throwable t) {
+            System.err.println("Error processing " + rawContext.getContig() + ":" + rawContext.getPosition());
+            t.printStackTrace(System.err);
+
+            throw new RuntimeException(t);
+        }
     }
+
+
+
+
 
     private void performRejection(CandidateMutation candidate) {
-	if (candidate.getTumorLodFStar() < MTAC.TUMOR_LOD_THRESHOLD) {
-	    candidate.addRejectionReason("fstar_tumor_lod");
-	}
+        if (candidate.getTumorLodFStar() < MTAC.TUMOR_LOD_THRESHOLD) {
+            candidate.addRejectionReason("fstar_tumor_lod");
+        }
 
-	if (MTAC.ARTIFACT_DETECTION_MODE) {
-	    return;
-	}
+        if (MTAC.ARTIFACT_DETECTION_MODE) {
+            return;
+        }
 
-	if (candidate.getTumorInsertionCount() >= MTAC.GAP_EVENTS_THRESHOLD
-		|| candidate.getTumorDeletionCount() >= MTAC.GAP_EVENTS_THRESHOLD) {
-	    candidate.addRejectionReason("nearby_gap_events");
-	}
 
-	if (MTAC.FRACTION_CONTAMINATION + MTAC.MINIMUM_MUTATION_CELL_FRACTION > 0
-		&& candidate.getTumorLodFStar() <= MTAC.TUMOR_LOD_THRESHOLD
-			+ Math.max(0, candidate.getContaminantLod())) {
-	    candidate.addRejectionReason("possible_contamination");
-	}
+        if (candidate.getTumorInsertionCount() >= MTAC.GAP_EVENTS_THRESHOLD ||
+                candidate.getTumorDeletionCount()  >= MTAC.GAP_EVENTS_THRESHOLD) {
+            candidate.addRejectionReason("nearby_gap_events");
+        }
 
-	if (candidate.isGermlineAtRisk() && candidate.getInitialNormalLod() < MTAC.NORMAL_DBSNP_LOD_THRESHOLD) {
-	    candidate.addRejectionReason("germline_risk");
-	}
+        if (MTAC.FRACTION_CONTAMINATION+MTAC.MINIMUM_MUTATION_CELL_FRACTION > 0 && candidate.getTumorLodFStar() <= MTAC.TUMOR_LOD_THRESHOLD + Math.max(0, candidate.getContaminantLod())) {
+            candidate.addRejectionReason("possible_contamination");
+        }
 
-	if (candidate.getInitialNormalLod() < MTAC.NORMAL_LOD_THRESHOLD) {
-	    candidate.addRejectionReason("normal_lod");
-	}
+        if (candidate.isGermlineAtRisk() && candidate.getInitialNormalLod() < MTAC.NORMAL_DBSNP_LOD_THRESHOLD) {
+            candidate.addRejectionReason("germline_risk");
+        }
 
-	if ((candidate.getInitialNormalAltCounts() >= MTAC.MAX_ALT_ALLELES_IN_NORMAL_COUNT || candidate.getNormalF() >= MTAC.MAX_ALT_ALLELE_IN_NORMAL_FRACTION)
-		&& candidate.getInitialNormalAltQualitySum() > MTAC.MAX_ALT_ALLELES_IN_NORMAL_QSCORE_SUM) {
-	    candidate.addRejectionReason("alt_allele_in_normal");
-	}
+        if (candidate.getInitialNormalLod() < MTAC.NORMAL_LOD_THRESHOLD) {
+            candidate.addRejectionReason("normal_lod");
+        }
 
-	if ((candidate.getTumorForwardOffsetsInReadMedian() != null
-		&& candidate.getTumorForwardOffsetsInReadMedian() <= MTAC.PIR_MEDIAN_THRESHOLD
-		&& candidate.getTumorForwardOffsetsInReadMad() != null && candidate.getTumorForwardOffsetsInReadMad() <= MTAC.PIR_MAD_THRESHOLD)
-		|| candidate.getTumorReverseOffsetsInReadMedian() != null
-		&& candidate.getTumorReverseOffsetsInReadMedian() <= MTAC.PIR_MEDIAN_THRESHOLD
-		&& candidate.getTumorReverseOffsetsInReadMad() != null
-		&& candidate.getTumorReverseOffsetsInReadMad() <= MTAC.PIR_MAD_THRESHOLD) {
-	    candidate.addRejectionReason("clustered_read_position");
+        if ( (candidate.getInitialNormalAltCounts() >= MTAC.MAX_ALT_ALLELES_IN_NORMAL_COUNT || candidate.getNormalF() >= MTAC.MAX_ALT_ALLELE_IN_NORMAL_FRACTION ) && candidate.getInitialNormalAltQualitySum() > MTAC.MAX_ALT_ALLELES_IN_NORMAL_QSCORE_SUM) {
+            candidate.addRejectionReason("alt_allele_in_normal");
+        }
 
-	}
+        if ( (candidate.getTumorForwardOffsetsInReadMedian() != null && candidate.getTumorForwardOffsetsInReadMedian() <= MTAC.PIR_MEDIAN_THRESHOLD && candidate.getTumorForwardOffsetsInReadMad() != null && candidate.getTumorForwardOffsetsInReadMad() <= MTAC.PIR_MAD_THRESHOLD) ||
+                candidate.getTumorReverseOffsetsInReadMedian() != null && candidate.getTumorReverseOffsetsInReadMedian() <= MTAC.PIR_MEDIAN_THRESHOLD && candidate.getTumorReverseOffsetsInReadMad() != null && candidate.getTumorReverseOffsetsInReadMad() <= MTAC.PIR_MAD_THRESHOLD ) {
+            candidate.addRejectionReason("clustered_read_position");
 
-	// TODO: sync naming (is it positive or forward)?
-	if ((candidate.getPowerToDetectNegativeStrandArtifact() >= MTAC.STRAND_ARTIFACT_POWER_THRESHOLD && candidate
-		.getTumorLodFStarForward() < MTAC.STRAND_ARTIFACT_LOD_THRESHOLD)
-		|| (candidate.getPowerToDetectPositiveStrandArtifact() >= MTAC.STRAND_ARTIFACT_POWER_THRESHOLD && candidate
-			.getTumorLodFStarReverse() < MTAC.STRAND_ARTIFACT_LOD_THRESHOLD)) {
-	    candidate.addRejectionReason("strand_artifact");
-	}
+        }
 
-	if (candidate.getTotalPairs() > 0
-		&& ((float) candidate.getMapQ0Reads() / (float) candidate.getTotalPairs()) >= MTAC.FRACTION_MAPQ0_THRESHOLD) {
-	    candidate.addRejectionReason("poor_mapping_region_mapq0");
-	}
+        // TODO: sync naming (is it positive or forward)?
+        if (
+                (candidate.getPowerToDetectNegativeStrandArtifact() >= MTAC.STRAND_ARTIFACT_POWER_THRESHOLD && candidate.getTumorLodFStarForward() < MTAC.STRAND_ARTIFACT_LOD_THRESHOLD) ||
+                        (candidate.getPowerToDetectPositiveStrandArtifact() >= MTAC.STRAND_ARTIFACT_POWER_THRESHOLD && candidate.getTumorLodFStarReverse() < MTAC.STRAND_ARTIFACT_LOD_THRESHOLD)
+                ) {
+            candidate.addRejectionReason("strand_artifact");
+        }
 
-	if (candidate.getTumorAltMaxMapQ() < MTAC.REQUIRED_MAXIMUM_ALT_ALLELE_MAPPING_QUALITY_SCORE) {
-	    candidate.addRejectionReason("poor_mapping_region_alternate_allele_mapq");
-	}
+        if (candidate.getTotalPairs() > 0 && ((float)candidate.getMapQ0Reads() / (float)candidate.getTotalPairs()) >= MTAC.FRACTION_MAPQ0_THRESHOLD) {
+            candidate.addRejectionReason("poor_mapping_region_mapq0");
+        }
 
-	if (candidate.isSeenInPanelOfNormals()) {
-	    if (candidate.isCosmicSite()) {
-		// if we saw it in the panel of normals, retain the call it was
-		// a COSMIC, but non-dbsnp site,
-	    } else {
-		// otherwise, reject it
-		candidate.addRejectionReason("seen_in_panel_of_normals");
-	    }
-	}
+        if (candidate.getTumorAltMaxMapQ() < MTAC.REQUIRED_MAXIMUM_ALT_ALLELE_MAPPING_QUALITY_SCORE) {
+            candidate.addRejectionReason("poor_mapping_region_alternate_allele_mapq");
+        }
+
+        if (candidate.isSeenInPanelOfNormals()) {
+            if (candidate.isCosmicSite()) {
+                // if we saw it in the panel of normals, retain the call it was a COSMIC, but non-dbsnp site,
+            } else {
+                // otherwise, reject it
+                candidate.addRejectionReason("seen_in_panel_of_normals");
+            }
+        }
 
     }
 
+
+
     public Integer treeReduce(Integer lhs, Integer rhs) {
-	return 0;
+        return 0;
     }
 
     // Given result of map function
     @Override
     public Integer reduceInit() {
-	return 0;
+        return 0;
     }
-
     @Override
     public Integer reduce(final Integer value, final Integer sum) {
-	return 0;
+        return 0;
     }
+
+
 
     int MAX_READ_MISMATCH_QUALITY_SCORE_SUM = 100;
     private static Character MAPPED_BY_MATE = 'M';
     IndexedFastaSequenceFile refReader;
 
-    private LocusReadPile filterReads(final ReferenceContext ref, final ReadBackedPileup pile,
-	    boolean filterMateRescueReads) {
-	ArrayList<PileupElement> newPileupElements = new ArrayList<PileupElement>();
+    private LocusReadPile filterReads(final ReferenceContext ref, final ReadBackedPileup pile, boolean filterMateRescueReads) {
+        ArrayList<PileupElement> newPileupElements = new ArrayList<PileupElement>();
 
-	for (PileupElement p : pile) {
-	    final GATKSAMRecord read = p.getRead();
+        for ( PileupElement p : pile ) {
+            final GATKSAMRecord read = p.getRead();
 
-	    int mismatchQualitySum = CGAAlignmentUtils.mismatchesInRefWindow(p, ref, false, true);
+            int mismatchQualitySum =
+                    CGAAlignmentUtils.mismatchesInRefWindow(p, ref, false, true);
 
-	    // do we have to many mismatches overall?
-	    if (mismatchQualitySum > this.MAX_READ_MISMATCH_QUALITY_SCORE_SUM) {
-		continue;
-	    }
+            // do we have to many mismatches overall?
+            if (mismatchQualitySum > this.MAX_READ_MISMATCH_QUALITY_SCORE_SUM) {
+                continue;
+            }
 
-	    // is this a heavily clipped read?
-	    if (SequenceUtils.isReadHeavilySoftClipped(read, MTAC.HEAVILY_CLIPPED_READ_FRACTION)) {
-		continue;
-	    }
+            // is this a heavily clipped read?
+            if (SequenceUtils.isReadHeavilySoftClipped(read, MTAC.HEAVILY_CLIPPED_READ_FRACTION)) {
+                continue;
+            }
 
-	    // was this read ONLY placed because it's mate was uniquely placed?
-	    // (supplied by BWA)
-	    if (filterMateRescueReads && MAPPED_BY_MATE.equals(read.getAttribute("XT"))) {
-		continue;
-	    }
+            // was this read ONLY placed because it's mate was uniquely placed? (supplied by BWA)
+            if (filterMateRescueReads && MAPPED_BY_MATE.equals(read.getAttribute("XT"))) {
+                continue;
+            }
 
-	    // if we're here... we passed all the read filters!
-	    newPileupElements.add(new PileupElement(p));
+            // if we're here... we passed all the read filters!
+			            newPileupElements.add(new PileupElement(p));
 
-	}
-	ReadBackedPileup newPileup = new ReadBackedPileupImpl(ref.getLocus(), newPileupElements);
 
-	return new LocusReadPile(newPileup, (char) ref.getBase(), 0, 0, MTAC.ENABLE_QSCORE_OUTPUT);
+        }
+        ReadBackedPileup newPileup =
+                new ReadBackedPileupImpl(ref.getLocus(), newPileupElements);
+
+
+        return new LocusReadPile(newPileup, (char)ref.getBase(), 0, 0, MTAC.ENABLE_QSCORE_OUTPUT);
     }
 
-    public enum ReadSource {
-	Tumor, Normal
-    }
+    public enum ReadSource { Tumor, Normal }
 
     private ReadSource getReadSource(SAMRecord read) {
-	// check if it's a tumor
-	SAMReaderID id = getToolkit().getReaderIDForRead(read);
-	if (tumorSAMReaderIDs.contains(id)) {
-	    return ReadSource.Tumor;
-	}
-	if (normalSAMReaderIDs.contains(id)) {
-	    return ReadSource.Normal;
-	}
+        // check if it's a tumor
+        SAMReaderID id = getToolkit().getReaderIDForRead(read);
+        if (tumorSAMReaderIDs.contains(id)) { return ReadSource.Tumor; }
+        if (normalSAMReaderIDs.contains(id)) { return ReadSource.Normal; }
 
-	// unexpected condition
-	throw new RuntimeException("Unable to determine read source (tumor,normal) for read " + read.getReadName());
+        // unexpected condition
+        throw new RuntimeException("Unable to determine read source (tumor,normal) for read " + read.getReadName());
     }
+
+
+
+
 
 }
