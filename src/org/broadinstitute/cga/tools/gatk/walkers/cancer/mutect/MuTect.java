@@ -147,7 +147,7 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
         
 	
 	public int compare(PileupElement o1, PileupElement o2) {
-	    return o1.getQual() - o2.getQual();
+	    return o2.getQual() - o1.getQual();
         }
     }
 
