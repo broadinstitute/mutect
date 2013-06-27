@@ -78,7 +78,7 @@ import java.util.*;
 
 @PartitionBy(PartitionType.LOCUS)
 @Reference(window=@Window(start=-1* MuTect.REFERENCE_HALF_WINDOW_LENGTH,stop= MuTect.REFERENCE_HALF_WINDOW_LENGTH))
-@By(DataSource.REFERENCE)
+@By(DataSource.READS)
 public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducible<Integer> {
     public static final int REFERENCE_HALF_WINDOW_LENGTH = 150;
     public static final String BAM_TAG_TUMOR = "tumor";
@@ -139,22 +139,15 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
     private NormalPowerCalculator normalDbSNPSitePowerCalculator;
     private TumorPowerCalculator strandArtifactPowerCalculator;
 
-    private static class PileupComparatorByAltRefQual implements Comparator<PileupElement> {
-        private byte alt;
+    private static class PileupComparatorByQual implements Comparator<PileupElement> {
+       
 
-        private PileupComparatorByAltRefQual(byte alt) {
-            this.alt = alt;
-        }
+        
 
-        public int compare(PileupElement o1, PileupElement o2) {
-            // if the bases are the same, the higher quality score comes first
-            if (o1.getBase() ==  o2.getBase()) {
-                if (o1.getQual() == o2.getQual()) { return 0; }
-                return (o1.getQual() > o2.getQual())?-1:1;
-            } else {
-                return (o1.getBase() == alt)?-1:1;
-            }
-
+        
+	
+	public int compare(PileupElement o1, PileupElement o2) {
+	    return o2.getQual() - o1.getQual();
         }
     }
 
@@ -481,27 +474,34 @@ public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducib
                 VariableAllelicRatioGenotypeLikelihoods contaminantLikelihoods
                         = new VariableAllelicRatioGenotypeLikelihoods(upRef, contaminantF);
 
-                List<PileupElement> peList = new ArrayList<PileupElement>(tumorReadPile.finalPileup.depthOfCoverage());
-                for(PileupElement pe : tumorReadPile.finalPileup) {
-                    peList.add(pe);
-                }
+                List<PileupElement> refList = new ArrayList<PileupElement>();
+		List<PileupElement> altList = new ArrayList<PileupElement>();
 
-                Collections.sort(peList, new PileupComparatorByAltRefQual((byte)altAllele));
-                int readsToKeep = (int) (peList.size() * contaminantAlternateFraction);
+		for (PileupElement element : tumorReadPile.finalPileup) {
+		    if (element.getBase() == altAllele) {
+			altList.add(element);
+		    } else {
+			refList.add(element);
+		    }
+		}
+		Collections.sort(altList, new PileupComparatorByQual());
 
-                for(PileupElement pe : peList) {
-                    byte base = pe.getBase();
-                    if (pe.getBase() == altAllele) {
-                        // if we've retained all we need, then turn the remainder of alts to ref
-                        if (readsToKeep == 0) {
-                            base = (byte) upRef;
-                        } else {
-                            readsToKeep--;
-                        }
-                    }
+		int readsToKeep = (int) ((altList.size() + refList.size()) * contaminantAlternateFraction);
 
-                    contaminantLikelihoods.add(base, pe.getQual());
-                }
+		for (PileupElement pe : altList) {
+		    byte base = pe.getBase();
+		    // if we've retained all we need, then turn the
+		    // remainder of alts to ref
+		    if (readsToKeep == 0) {
+			base = (byte) upRef;
+		    } else {
+			readsToKeep--;
+		    }
+		    contaminantLikelihoods.add(base, pe.getQual());
+		}
+		for (PileupElement pe : refList) {
+		    contaminantLikelihoods.add((byte) upRef, pe.getQual());
+		}
                 double[] refHetHom = LocusReadPile.extractRefHetHom(contaminantLikelihoods, upRef, altAllele);
                 double contaminantLod = refHetHom[1] - refHetHom[0];
                 candidate.setContaminantLod(contaminantLod);
