@@ -79,7 +79,7 @@ import java.util.*;
 @PartitionBy(PartitionType.LOCUS)
 @Reference(window=@Window(start=-1* MuTect.REFERENCE_HALF_WINDOW_LENGTH,stop= MuTect.REFERENCE_HALF_WINDOW_LENGTH))
 @By(DataSource.REFERENCE)
-public class MuTect extends LocusWalker<Integer, Integer> implements TreeReducible<Integer> {
+public class MuTect extends LocusWalker<Integer, Integer>  {
     public static final int REFERENCE_HALF_WINDOW_LENGTH = 150;
     public static final String BAM_TAG_TUMOR = "tumor";
     public static final String BAM_TAG_NORMAL = "normal";
