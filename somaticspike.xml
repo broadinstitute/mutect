@@ -1,9 +1,18 @@
-<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
-<html><head>
-<title>404 Not Found</title>
-</head><body>
-<h1>Not Found</h1>
-<p>The requested URL /CancerGenomeAnalysis/trunk/analysis_pipeline/gatk/walkers/somaticspike.xml was not found on this server.</p>
-<hr>
-<address>Apache/2.2.16 (Ubuntu) Server at vc Port 443</address>
-</body></html>
+<?xml version="1.0" encoding="UTF-8"?>
+<package name="SomaticSpike">
+  <version file="StingText.properties" property="org.broadinstitute.sting.gatk.version" />
+  <executable name="SomaticSpike">
+    <main-class name="org.broadinstitute.sting.gatk.CommandLineGATK" />
+    <resource-bundle file="StingText.properties" />
+    <dependencies>
+      <!-- Walkers in this package -->
+      <class name="org.broadinstitute.cga.tools.gatk.walkers.cancer.simulation.SomaticSpike" />
+      <!-- Some additional dependencies that bcel is unable to find on its own -->
+      <package name="org.broad.tribble.*" />
+      <package name="org.broadinstitute.cga.tools.gatk.filters" />
+      <package name="org.broadinstitute.sting.commandline" />
+      <package name="org.broadinstitute.sting.gatk.filters" />
+      <package name="org.apache.commons.logging.impl" />
+    </dependencies>
+  </executable>
+</package>
