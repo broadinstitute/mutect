@@ -1,0 +1,22 @@
+The BAM files in this directory were created according to the following procedure.  All data used is freely available to the public
+
+1. Download full exome BAMs for HCC1143 and HCC1143_BL from CGHub using GeneTorrent with the following data UUIDs:
+    - HCC1143 (Tumor): 89324e86-5b7a-4f69-92c1-3b67293f8748
+    - HCC1143_BL (Normal): ebdb53ae-6386-4bc4-90b1-4f249ff9fcdf
+	
+   with a command like
+
+    gtdownload -d <UUID>
+
+2. set the following environment variables 
+    - $TUMOR and $NORMAL to be the BAM files downloaded above
+    - $REF to be human_g1k_v37 (available in the GATK reference bundle)
+    - $GATK to be the GenomeAnalysisTK.jar file from a recent GATK release (> 2.5)
+
+3. create micro and small regression data sets containing 10 and 236 exons respectively with the following commands:
+
+    java -Xmx4g -jar $GATK -T PrintReads -dt NONE --simplify -R $REF -L target.exons.micro.bed -I $TUMOR -o HCC1143.cghub.ccle.micro.bam
+    java -Xmx4g -jar $GATK -T PrintReads -dt NONE --simplify -R $REF -L target.exons.micro.bed -I $NORMAL -o HCC1143_BL.cghub.ccle.micro.bam
+
+    java -Xmx4g -jar $GATK -T PrintReads -dt NONE --simplify -R $REF -L target.exons.small.bed -I $TUMOR -o HCC1143.cghub.ccle.small.bam
+    java -Xmx4g -jar $GATK -T PrintReads -dt NONE --simplify -R $REF -L target.exons.small.bed -I $NORMAL -o HCC1143_BL.cghub.ccle.small.bam
