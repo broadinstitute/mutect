@@ -78,10 +78,8 @@
 
     <target name="dist" depends="init,compile,insertversion">
         <jar jarfile="${dist.dir}/CancerGenomeAnalysisTools.jar">
-            <fileset dir="${build.dir}" includes="org/broadinstitute/cga/tools/util/**" />
             <fileset dir="${build.dir}" includes="org/broadinstitute/cga/tools/gatk/walkers/cancer/**" />
             <fileset dir="${build.dir}" includes="org/broadinstitute/cga/tools/gatk/utils/**" />
-            <fileset dir="${build.dir}" includes="org/broadinstitute/cga/tools/gatk/filters/**" />
             <fileset dir="${build.dir}" includes="CGAText.properties" />
         </jar>
     </target>
