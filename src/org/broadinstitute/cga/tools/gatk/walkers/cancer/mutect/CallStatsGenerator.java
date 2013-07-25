@@ -88,8 +88,7 @@ public class CallStatsGenerator {
         l.add("normal_power");
         l.add("normal_power_nsp");
         l.add("normal_power_wsp");
-        l.add("total_pairs");
-        l.add("improper_pairs");
+        l.add("total_reads");
         l.add("map_Q0_reads");
         l.add("init_t_lod");
         l.add("t_lod_fstar");
@@ -169,8 +168,7 @@ public class CallStatsGenerator {
         d.put("normal_power", format(candidate.getNormalPower()));
         d.put("normal_power_nsp", format(candidate.getNormalPowerNoSNPPrior()));
         d.put("normal_power_wsp", format(candidate.getNormalPowerWithSNPPrior()));
-        d.put("total_pairs", format(candidate.getTotalPairs()));
-        d.put("improper_pairs", format(candidate.getImproperPairs()));
+        d.put("total_reads", format(candidate.getTotalReads()));
         d.put("map_Q0_reads", format(candidate.getMapQ0Reads()));
         d.put("init_t_lod", format(candidate.getInitialTumorLod()));
         d.put("t_lod_fstar", format(candidate.getTumorLodFStar()));

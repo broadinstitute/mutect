@@ -85,8 +85,7 @@ public class CandidateMutation {
     private int tumorQ20Count;
     private int normalQ20Count;
 
-    private int totalPairs;
-    private int improperPairs;
+    private int totalReads;
     private int mapQ0Reads;
     private int initialTumorRefCounts;
     private int initialTumorAltCounts;
@@ -456,20 +455,12 @@ public class CandidateMutation {
         this.tumorDeletionCount = tumorDeletionCount;
     }
 
-    public int getTotalPairs() {
-        return totalPairs;
+    public int getTotalReads() {
+        return totalReads;
     }
 
-    public void setTotalPairs(int totalPairs) {
-        this.totalPairs = totalPairs;
-    }
-
-    public int getImproperPairs() {
-        return improperPairs;
-    }
-
-    public void setImproperPairs(int improperPairs) {
-        this.improperPairs = improperPairs;
+    public void setTotalReads(int totalReads) {
+        this.totalReads = totalReads;
     }
 
     public int getMapQ0Reads() {

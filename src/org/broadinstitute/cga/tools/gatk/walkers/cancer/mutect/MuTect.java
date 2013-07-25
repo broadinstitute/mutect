@@ -80,6 +80,7 @@ import java.util.*;
 @Reference(window=@Window(start=-1* MuTect.REFERENCE_HALF_WINDOW_LENGTH,stop= MuTect.REFERENCE_HALF_WINDOW_LENGTH))
 @By(DataSource.REFERENCE)
 public class MuTect extends LocusWalker<Integer, Integer>  {
+    public enum SampleType {TUMOR, NORMAL}
     public static final int REFERENCE_HALF_WINDOW_LENGTH = 150;
     public static final String BAM_TAG_TUMOR = "tumor";
     public static final String BAM_TAG_NORMAL = "normal";
@@ -181,7 +182,9 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
         if (MTAC.NOOP) {
             return;
         }
+
         //setting version info
+        // TODO: refactor into getMuTectVersion()
         final String gatkVersion = CommandLineGATK.getVersionNumber();
         ResourceBundle resources = TextFormattingUtils.loadResourceBundle("CGAText");
         final String mutectVersion = resources.containsKey("version")? resources.getString("version") : "<unknown>";        
@@ -270,12 +273,12 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
         }
 
         // initialize the call-stats file
-        //out.println("## muTect v1.0." + VERSION.split(" ")[1]);
         out.println("##"+combinedVersion);
         out.println(callStatsGenerator.generateHeader());
 
         // initialize the VCF output
         if (vcf != null) {
+            // TODO: fix for multisample mode
             Set<String> samples = new HashSet<String>();
             samples.add(MTAC.TUMOR_SAMPLE_NAME);
             samples.add(MTAC.NORMAL_SAMPLE_NAME);
@@ -286,7 +289,6 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
         lastTime = System.currentTimeMillis();
     }
 
-    public static int MAX_INSERT_SIZE = 10000;
     private long totalReadsProcessed = 0;
     private long binReadsProcessed = 0;
     private long lastTime;
@@ -316,62 +318,23 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
         // an optimization to speed things up when there is no coverage
         if ( !MTAC.FORCE_OUTPUT && numberOfReads == 0) { return -1; }
 
-        final char upRef = Character.toUpperCase(ref.getBaseAsChar());
+        // get sequence context around mutation
         String sequenceContext = SequenceUtils.createSequenceContext(ref, 3);
+
+        // only process bases where the reference is [ACGT], because the FASTA for HG18 has N,M and R!
+        final char upRef = Character.toUpperCase(ref.getBaseAsChar());
+        if (upRef != 'A' && upRef != 'C' && upRef != 'G' && upRef != 'T') {
+            return -1;
+        }
 
         try {
 
-
-            // only process bases where the reference is [ACGT], because the FASTA for HG18 has N,M and R!
-            if (upRef != 'A' && upRef != 'C' && upRef != 'G' && upRef != 'T') {
-                return -1;
-            }
-
-            ArrayList<PileupElement> tumorPileupElements = new ArrayList<PileupElement>();
-            ArrayList<PileupElement> normalPileupElements = new ArrayList<PileupElement>();
-
-            int totalPairs = 0;
-            int improperPairs = 0;
-            for (PileupElement p : pileup ) {
-                final GATKSAMRecord read = p.getRead();
-                final byte base = p.getBase();
-
-                if (base == ((byte)'N') || base == ((byte)'n')) {
-                    continue;
-                }
-
-                // count # of reads that are part of a mapped pair where the 'proper pair'
-                // flag is false or the insert size is > 10kb
-                if (read.getReadPairedFlag() && !read.getMateUnmappedFlag()) {
-                    totalPairs++;
-                    if (!read.getProperPairFlag() || read.getInferredInsertSize() >= MAX_INSERT_SIZE) {
-                        improperPairs++;
-                    }
-                }
+            Map<SampleType, ReadBackedPileup> pileupMap = getPileupsBySampleType(pileup);
 
 
-                // Add the read to the appropriate pile of reads
-                ReadSource source = getReadSource(p.getRead());
-                if (source == ReadSource.Tumor) {
-                    tumorPileupElements.add(p);
-                } else if (source == ReadSource.Normal) {
-                    normalPileupElements.add(p);
-                }
-            }
 
-            ReadBackedPileup normalPileup =
-                    new ReadBackedPileupImpl(rawContext.getLocation(), normalPileupElements);
-
-            ReadBackedPileup tumorPileup =
-                    new ReadBackedPileupImpl(rawContext.getLocation(), tumorPileupElements);
-
-            if (MTAC.BAM_TUMOR_SAMPLE_NAME != null) {
-                tumorPileup = tumorPileup.getPileupForSample(MTAC.BAM_TUMOR_SAMPLE_NAME);
-            }
-
-            final LocusReadPile tumorReadPile = new LocusReadPile(tumorPileup, upRef, MTAC.MIN_QSCORE, MIN_QSUM_QSCORE, false, MTAC.ARTIFACT_DETECTION_MODE, MTAC.ENABLE_QSCORE_OUTPUT);
-            final LocusReadPile normalReadPile = new LocusReadPile(normalPileup, upRef, MTAC.MIN_QSCORE, 0, this.USE_MAPQ0_IN_NORMAL_QSCORE, true, MTAC.ENABLE_QSCORE_OUTPUT);
-
+            final LocusReadPile tumorReadPile =  new LocusReadPile(pileupMap.get(SampleType.TUMOR), upRef, MTAC.MIN_QSCORE, MIN_QSUM_QSCORE, false, MTAC.ARTIFACT_DETECTION_MODE, MTAC.ENABLE_QSCORE_OUTPUT);
+            final LocusReadPile normalReadPile = new LocusReadPile(pileupMap.get(SampleType.NORMAL), upRef, MTAC.MIN_QSCORE, 0, this.USE_MAPQ0_IN_NORMAL_QSCORE, true, MTAC.ENABLE_QSCORE_OUTPUT);
 
             Collection<VariantContext> panelOfNormalsVC = tracker.getValues(normalPanelRod, rawContext.getLocation());
             Collection<VariantContext> cosmicVC = tracker.getValues(cosmicRod, rawContext.getLocation());
@@ -418,10 +381,14 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
 
             powerWriter.writeCoverage(rawContext, combinedPower);
 
+
             int mapQ0Reads =
                     tumorReadPile.qualityScoreFilteredPileup.getNumberOfMappingQualityZeroReads() +
                             normalReadPile.qualityScoreFilteredPileup.getNumberOfMappingQualityZeroReads();
 
+            int totalReads =
+                    tumorReadPile.qualityScoreFilteredPileup.depthOfCoverage() +
+                            normalReadPile.qualityScoreFilteredPileup.depthOfCoverage();
 
             // Test each of the possible alternate alleles
             for (final char altAllele : new char[]{'A','C','G','T'}) {
@@ -442,9 +409,8 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
                 candidate.setNormalQ20Count(normalQ20BaseCount);
                 candidate.setInitialTumorNonRefQualitySum(tumorReadPile.qualitySums.getOtherQualities(upRef));
                 candidate.setAltAllele(altAllele);
-                candidate.setTotalPairs(totalPairs);
-                candidate.setImproperPairs(improperPairs);
                 candidate.setMapQ0Reads(mapQ0Reads);
+                candidate.setTotalReads(totalReads);
                 candidate.setContaminationFraction(MTAC.FRACTION_CONTAMINATION);
                 candidate.setPanelOfNormalsVC(panelOfNormalsVC.isEmpty()?null:panelOfNormalsVC.iterator().next()); // if there are multiple, we're just grabbing the first
                 candidate.setCosmicSite(!cosmicVC.isEmpty());
@@ -720,7 +686,7 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
             candidate.addRejectionReason("strand_artifact");
         }
 
-        if (candidate.getTotalPairs() > 0 && ((float)candidate.getMapQ0Reads() / (float)candidate.getTotalPairs()) >= MTAC.FRACTION_MAPQ0_THRESHOLD) {
+        if (candidate.getTotalReads() > 0 && ((float)candidate.getMapQ0Reads() / (float)candidate.getTotalReads()) >= MTAC.FRACTION_MAPQ0_THRESHOLD) {
             candidate.addRejectionReason("poor_mapping_region_mapq0");
         }
 
@@ -756,6 +722,45 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
     }
 
 
+    protected Map<SampleType, ReadBackedPileup> getPileupsBySampleType(ReadBackedPileup pileup) {
+        Map<SampleType, ReadBackedPileup> result = new HashMap<SampleType, ReadBackedPileup>();
+
+        ArrayList<PileupElement> tumorPileupElements = new ArrayList<PileupElement>();
+        ArrayList<PileupElement> normalPileupElements = new ArrayList<PileupElement>();
+
+        for (PileupElement p : pileup ) {
+            final GATKSAMRecord read = p.getRead();
+            final byte base = p.getBase();
+
+            if (base == ((byte)'N') || base == ((byte)'n')) {
+                continue;
+            }
+
+            // Add the read to the appropriate pile of reads
+            ReadSource source = getReadSource(p.getRead());
+            if (source == ReadSource.Tumor) {
+                tumorPileupElements.add(p);
+            } else if (source == ReadSource.Normal) {
+                normalPileupElements.add(p);
+            }
+        }
+
+        ReadBackedPileup normalPileup =
+                new ReadBackedPileupImpl(pileup.getLocation(), normalPileupElements);
+
+        ReadBackedPileup tumorPileup =
+                new ReadBackedPileupImpl(pileup.getLocation(), tumorPileupElements);
+
+        // if the user specified a single tumor sample name, only look at that sample
+        if (MTAC.BAM_TUMOR_SAMPLE_NAME != null) {
+            tumorPileup = tumorPileup.getPileupForSample(MTAC.BAM_TUMOR_SAMPLE_NAME);
+        }
+
+        result.put(SampleType.NORMAL, normalPileup);
+        result.put(SampleType.TUMOR, tumorPileup);
+
+        return result;
+    }
 
     int MAX_READ_MISMATCH_QUALITY_SCORE_SUM = 100;
     private static Character MAPPED_BY_MATE = 'M';
