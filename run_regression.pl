@@ -21,7 +21,6 @@ my $cmd =
 			"--tumor_sample_name Tumor --normal_sample_name Normal " .
 			"--fraction_contamination 0.01 " .
 			"--force_output " .
-			"--multisample " .
 			"-dt NONE " .
 			"-I:normal testdata/HCC1143_BL.cghub.ccle.$size.bam " .
 			"-I:tumor testdata/HCC1143.cghub.ccle.$size.bam " .
