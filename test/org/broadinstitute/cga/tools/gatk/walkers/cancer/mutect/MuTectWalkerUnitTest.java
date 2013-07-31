@@ -1,35 +1,84 @@
 package org.broadinstitute.cga.tools.gatk.walkers.cancer.mutect;
 
+import net.sf.picard.reference.IndexedFastaSequenceFile;
+import net.sf.samtools.CigarElement;
+import net.sf.samtools.CigarOperator;
 import net.sf.samtools.SAMFileHeader;
+import org.broadinstitute.sting.BaseTest;
 import org.broadinstitute.sting.gatk.contexts.ReferenceContext;
 import org.broadinstitute.sting.utils.GenomeLoc;
 import org.broadinstitute.sting.utils.GenomeLocParser;
+import org.broadinstitute.sting.utils.Utils;
+import org.broadinstitute.sting.utils.fasta.CachingIndexedFastaSequenceFile;
 import org.broadinstitute.sting.utils.pileup.PileupElement;
 import org.broadinstitute.sting.utils.pileup.ReadBackedPileup;
 import org.broadinstitute.sting.utils.pileup.ReadBackedPileupImpl;
 import org.broadinstitute.sting.utils.sam.ArtificialSAMUtils;
 import org.broadinstitute.sting.utils.sam.GATKSAMRecord;
 import org.testng.Assert;
-import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.*;
 
 /**
  * Unit tests for MuTect
  */
-public class MuTectWalkerUnitTest {
+public class MuTectWalkerUnitTest extends BaseTest {
     public byte ref = 'A';
     public byte alt = 'T';
 
-    @BeforeMethod
-    public void doForEachTest() throws FileNotFoundException {
+    // example genome loc parser for this test, can be deleted if you don't use the reference
+    private GenomeLocParser genomeLocParser;
 
+    // example fasta index file, can be deleted if you don't use the reference
+    private IndexedFastaSequenceFile seq;
+
+    @BeforeClass
+    public void setup() throws FileNotFoundException {
+        // sequence
+        seq = new CachingIndexedFastaSequenceFile(new File(hg19Reference));
+        genomeLocParser = new GenomeLocParser(seq);
     }
 
-    @Test(enabled = false)
-    public void basic() {
+    @Test
+    public void basicPileupTest() {
+        final SAMFileHeader header = ArtificialSAMUtils.createArtificialSamHeader(seq.getSequenceDictionary());
+        final GenomeLoc myLocation = genomeLocParser.createGenomeLoc("1", 10);
+
+        final int pileupSize = 100;
+        final int readLength = 10;
+        final List<GATKSAMRecord> reads = new LinkedList<GATKSAMRecord>();
+        for ( int i = 0; i < pileupSize; i++ ) {
+            final GATKSAMRecord read = ArtificialSAMUtils.createArtificialRead(header, "myRead" + i, 0, 1, readLength);
+            final byte[] bases = Utils.dupBytes((byte) 'A', readLength);
+            bases[0] = (byte)(i % 2 == 0 ? 'A' : 'C'); // every other base is a C
+
+            // set the read's bases and quals
+            read.setReadBases(bases);
+            read.setBaseQualities(Utils.dupBytes((byte)30, readLength));
+            reads.add(read);
+        }
+
+        // create a pileup with all reads having offset 0
+        final ReadBackedPileup pileup = new ReadBackedPileupImpl(myLocation, reads, 0);
+        // TODO -- add some tests here using pileup
+
+        // this code ensures that the pileup example is correct.  Can be deleted
+        Assert.assertEquals(pileup.getNumberOfElements(), pileupSize);
+        int nA = 0, nC = 0;
+        for ( final PileupElement p : pileup ) {
+            if ( p.getBase() == 'A' ) nA++;
+            if ( p.getBase() == 'C' ) nC++;
+        }
+        Assert.assertEquals(nA, pileupSize / 2);
+        Assert.assertEquals(nC, pileupSize / 2);
+    }
+
+    @Test(enabled = true)
+    public void simulate() {
         SAMFileHeader header = ArtificialSAMUtils.createArtificialSamHeader(1, 1, 1000);
         GenomeLocParser genomeLocParser;
         genomeLocParser = new GenomeLocParser(header.getSequenceDictionary());
@@ -40,7 +89,7 @@ public class MuTectWalkerUnitTest {
 
         final double qScoreStandardDeviation = 0.000001;
 
-        final int trials = 10000;
+        final int trials = 100; // set to 10,000 for paper
 
         final Integer[] depths = new Integer[]{5,10,15,20,25,30,35,40,45,50};
         final Double[] trueAlleleFractions = new Double[]{0.1, 0.2, 0.4};
@@ -84,7 +133,7 @@ public class MuTectWalkerUnitTest {
                     }
 
                     ReadBackedPileup tumor  = createReadBackedPileup(header, loc, readLen, qscores, bases);
-                    LocusReadPile tp = new LocusReadPile(tumor, (char)ref, 0,0,false, false);
+                    LocusReadPile tp = new LocusReadPile(tumor, (char)ref, 0,0,false, false, false);
 
                     // to use f or f-star?
                     double observedF = tp.estimateAlleleFraction((char)ref, (char)alt);
@@ -148,7 +197,10 @@ public class MuTectWalkerUnitTest {
             quals[offset] = pileQscores[i];
             read.setBaseQualities(quals);
 
-            pileupElements.add(new PileupElement(read, pos - leftStart, false, false, false, false, false, false));
+            PileupElement pe =
+                    new PileupElement(read, pos - leftStart, new CigarElement(readLen, CigarOperator.M), 0, 0);
+
+            pileupElements.add(pe);
         }
 
         Collections.sort(pileupElements);
