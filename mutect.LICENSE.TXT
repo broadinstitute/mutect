@@ -9,7 +9,7 @@ WHEREAS, LICENSEE desires to license the PROGRAM and BROAD desires to grant a li
 NOW, THEREFORE, in consideration of the promises and covenants made herein, the parties hereto agree as follows:
 
 1. DEFINITIONS
-1.1	"PROGRAM" shall mean copyright in the object code and source code known as MuTect and related documentation, if any, as they exist on the EFFECTIVE DATE and can be downloaded from http://www.broadinstitute.or/cancer/cga/mutect on the EFFECTIVE DATE.
+1.1	"PROGRAM" shall mean copyright in the object code and source code known as MuTect and related documentation, if any, as they exist on the EFFECTIVE DATE and can be downloaded from http://www.broadinstitute.org/cancer/cga/mutect on the EFFECTIVE DATE.
 
 2. LICENSE
 2.1   Grant. Subject to the terms of this Agreement, BROAD hereby grants to LICENSEE, solely for academic non-commercial research purposes, a non-exclusive, non-transferable license to: (a) download, execute and display the PROGRAM and (b) create bug fixes and modify the PROGRAM.
