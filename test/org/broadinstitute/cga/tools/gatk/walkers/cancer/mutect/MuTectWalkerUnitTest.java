@@ -91,8 +91,8 @@ public class MuTectWalkerUnitTest extends BaseTest {
 
         final int trials = 100; // set to 10,000 for paper
 
-        final Integer[] depths = new Integer[]{5,10,15,20,25,30,35,40,45,50};
-        final Double[] trueAlleleFractions = new Double[]{0.1, 0.2, 0.4};
+        final Integer[] depths = new Integer[]{0, 5,10,15,20,25,30,35,40,45,50};
+        final Double[] trueAlleleFractions = new Double[]{0.1, 0.2, 0.4, 0.5};
 
         ReferenceContext refContext = new ReferenceContext(genomeLocParser, loc, (byte)ref);
         Random r = new Random();
@@ -205,6 +205,41 @@ public class MuTectWalkerUnitTest extends BaseTest {
 
         Collections.sort(pileupElements);
         return new ReadBackedPileupImpl(loc, pileupElements);
+    }
+
+    @Test
+    public void testPileupComparator() {
+        byte A = (byte) 'A';
+        byte C = (byte) 'C';
+        byte T = (byte) 'T';
+        byte Q30 = (byte) 30;
+        byte Q60 = (byte) 60;
+
+        MuTect.PileupComparatorByAltRefQual c = new MuTect.PileupComparatorByAltRefQual(A);
+
+        // recall:
+        //      A<B -> -1
+        //      A=B ->  0
+        //      A>B ->  1
+        Assert.assertEquals(c.internalCompare(A, Q30, A, Q60), 1);
+        Assert.assertEquals(c.internalCompare(A, Q60, A, Q30), -1);
+        Assert.assertEquals(c.internalCompare(A, Q60, A, Q60), 0);
+
+        Assert.assertEquals(c.internalCompare(C, Q30, C, Q60), 1);
+        Assert.assertEquals(c.internalCompare(C, Q60, C, Q30), -1);
+        Assert.assertEquals(c.internalCompare(C, Q60, C, Q60), 0);
+
+        Assert.assertEquals(c.internalCompare(A, Q30, C, Q60), -1);
+        Assert.assertEquals(c.internalCompare(A, Q60, C, Q30), -1);
+        Assert.assertEquals(c.internalCompare(A, Q60, C, Q60), -1);
+
+        Assert.assertEquals(c.internalCompare(C, Q30, A, Q60), 1);
+        Assert.assertEquals(c.internalCompare(C, Q60, A, Q30), 1);
+        Assert.assertEquals(c.internalCompare(C, Q60, A, Q60), 1);
+
+        Assert.assertEquals(c.internalCompare(C, Q60, T, Q60), -1);
+        Assert.assertEquals(c.internalCompare(T, Q60, C, Q60), 1);
+
     }
 
     public static int getBinomial(int n, double p) {

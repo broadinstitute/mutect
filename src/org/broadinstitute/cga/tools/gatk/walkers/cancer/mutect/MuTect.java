@@ -140,23 +140,36 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
     private NormalPowerCalculator normalDbSNPSitePowerCalculator;
     private TumorPowerCalculator strandArtifactPowerCalculator;
 
-    private static class PileupComparatorByAltRefQual implements Comparator<PileupElement> {
+    public static class PileupComparatorByAltRefQual implements Comparator<PileupElement> {
         private byte alt;
 
-        private PileupComparatorByAltRefQual(byte alt) {
+        public PileupComparatorByAltRefQual(byte alt) {
             this.alt = alt;
         }
 
         public int compare(PileupElement o1, PileupElement o2) {
-            // if the bases are the same, the higher quality score comes first
-            if (o1.getBase() ==  o2.getBase()) {
-                if (o1.getQual() == o2.getQual()) { return 0; }
-                return (o1.getQual() > o2.getQual())?-1:1;
-            } else {
-                return (o1.getBase() == alt)?-1:1;
-            }
-
+            return internalCompare(o1.getBase(), o1.getQual(), o2.getBase(), o2.getQual());
         }
+
+        public int internalCompare(byte base1, byte qual1, byte base2, byte qual2) {
+            // if the bases are the same, the higher quality score comes first
+            if (base1 == base2) {
+                if (qual1 == qual2) { return 0; }
+                return (qual1 > qual2)?-1:1;
+
+            // if the bases are not the same, then the alternate is first
+            } else {
+                if (base1 == alt) {
+                    return -1;
+                } else if (base2 == alt) {
+                    return 1;
+                } else {
+                    return base1 < base2?-1:1;
+                }
+
+            }
+        }
+
     }
 
 
@@ -729,7 +742,6 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
         ArrayList<PileupElement> normalPileupElements = new ArrayList<PileupElement>();
 
         for (PileupElement p : pileup ) {
-            final GATKSAMRecord read = p.getRead();
             final byte base = p.getBase();
 
             if (base == ((byte)'N') || base == ((byte)'n')) {
