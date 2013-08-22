@@ -575,10 +575,10 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
                 final LocusReadPile refPile =  new LocusReadPile(referencePileup, altAllele, 0, 0, MTAC.ENABLE_QSCORE_OUTPUT);
 
                 // Set the maximum observed mapping quality score for the reference and alternate alleles
-                byte[] rmq = referencePileup.getMappingQuals();
+                int[] rmq = referencePileup.getMappingQuals();
                 candidate.setTumorRefMaxMapQ((rmq.length==0)?0:NumberUtils.max(rmq));
 
-                byte[] amq = mutantPileup.getMappingQuals();
+                int[] amq = mutantPileup.getMappingQuals();
                 candidate.setTumorAltMaxMapQ((amq.length==0)?0:NumberUtils.max(amq));
 
                 candidate.setStrandContingencyTable(SequenceUtils.getStrandContingencyTable(refPile, mutantPile));
