@@ -2,55 +2,57 @@
 use strict;
 
 if (scalar(@ARGV) < 3) {
-    die("usage: make_walker_release.pl <mutect-dir> <gatk-dir> <mutect-tag> <gatk-tag>\n  for example: make_walker_release.pl  /xchip/cga1/kcibul/cga/analysis_pipeline/gatk /xchip/cga1/kcibul/sting 1.1.5 2.5\n");
+    die("usage: make_mutect_release.pl <tmp-dir> <mutect-tag> <gatk-tag>\n  for example: make_walker_release.pl /tmp 1.1.5 2.5\n");
 }
-my ($CGA_DIR, $GATK_DIR, $tag, $gatk_tag) = @ARGV;
-my $tool = "muTect";
+my ($TMP_DIR, $mutect_tag, $gatk_tag) = @ARGV;
 
+my $BASE_DIR = "$TMP_DIR/mutect-dist";
+my $GATK_DIR = "$BASE_DIR/gatk-protected";
+my $MUTECT_DIR = "$BASE_DIR/mutect-src";
 my $cwd = `pwd`;
 chomp($cwd);
 
-my $tmp = "/tmp/$tool-dist-tmp";
-if (-e $tmp) { `rm -rf $tmp`; }
-`mkdir -p $tmp`;
+my $TMP_DIST = "/tmp/muTect-dist-tmp";
+if (-e $TMP_DIST) { `rm -rf $TMP_DIST`; }
+`mkdir -p $TMP_DIST`;
 
-# check to see if this tag exists
-my $cnt = `git ls-remote --tags -q | grep refs/tags/$tag | wc -l`;
-chomp($cnt);
-if ($cnt == 0) { die("ERROR: release tag $tag does not exist!\n"); }
+if (-e $BASE_DIR) { `rm -rf $BASE_DIR`; }
+`mkdir -p $MUTECT_DIR`;
+
 
 # update CGA and get revision info
-chdir($CGA_DIR);
-system("git pull") == 0 or die();
-system("git reset --hard $tag") == 0 or die();
-`git describe | awk '{ print "$tool Revision: " \$0 }' > $tmp/version.txt`;
+system("cd $MUTECT_DIR && git clone git\@github.com:broadinstitute/mutect.git") == 0 or die();
 
-my $outputZip = "$cwd/muTect-$tag-bin.zip";
+# check to see if this tag exists
+my $cnt = `cd $MUTECT_DIR/mutect && git ls-remote --tags -q | grep refs/tags/$mutect_tag | wc -l`;
+chomp($cnt);
+if ($cnt == 0) { die("ERROR: release tag $mutect_tag does not exist!\n"); }
+system("cd $MUTECT_DIR/mutect && git reset --hard $mutect_tag") == 0 or die();
+`cd $MUTECT_DIR/mutect && git describe | awk '{ print "MuTect Revision: " \$0 }' > $TMP_DIST/version.txt`;
+
+my $outputZip = "$cwd/muTect-$mutect_tag-bin.zip";
 if (-e $outputZip) { die("release $outputZip already exists!!\n"); }
 
 # update GATK and get revision info
+chdir($BASE_DIR);
+system("git clone git\@github.com:broadgsa/gatk-protected.git") == 0 or die();
 chdir($GATK_DIR);
-system("git pull") == 0 or die();
 system("git reset --hard $gatk_tag") == 0 or die();
-`git describe | awk '{ print "GATK Revision: " \$0 }' >> $tmp/version.txt`;
+`git describe | awk '{ print "GATK Revision: " \$0 }' >> $TMP_DIST/version.txt`;
 
 # do a clean build
-chdir($GATK_DIR);
-system("ant clean") == 0 or die();
-system("ant -Dexternal.dir=$CGA_DIR/.. -Dexecutable=" . lc($tool) . " package") == 0 or die();
+system("cd $GATK_DIR && ant clean") == 0 or die();
+system("cd $GATK_DIR && ant -Dexternal.dir=$MUTECT_DIR -Dexecutable=mutect package") == 0 or die();
 
 # move the executable over to the release directory
-system("cp $GATK_DIR/dist/packages/$tool-*/$tool.jar $tmp/$tag.jar") == 0 or die();
+system("cp $GATK_DIR/dist/packages/muTect-*/muTect.jar $TMP_DIST/muTect-$mutect_tag.jar") == 0 or die();
 
 # move the license over to the release directory
-system("cp $CGA_DIR/" . lc($tool) . ".LICENSE.TXT $tmp/LICENSE.TXT") == 0 or die();
+system("cp $MUTECT_DIR/mutect/mutect.LICENSE.TXT $TMP_DIST/LICENSE.TXT") == 0 or die();
 
 # zip it up
 chdir($cwd);
-system("zip -j $outputZip $tmp/*") == 0 or die();
-
-# tag subversion with the version
-#system("svn copy https://svnrepos/CancerGenomeAnalysis/trunk/analysis_pipeline/gatk https://svnrepos/CancerGenomeAnalysis/tags/$tag -m \"Tagging $tag\"") == 0 or die();
+system("zip -j $outputZip $TMP_DIST/*") == 0 or die();
 
 
 
