@@ -12,7 +12,7 @@ my $MUTECT_DIR = "$BASE_DIR/mutect-src";
 my $cwd = `pwd`;
 chomp($cwd);
 
-my $TMP_DIST = "/tmp/muTect-dist-tmp";
+my $TMP_DIST = "/tmp/mutect-dist-zip";
 if (-e $TMP_DIST) { `rm -rf $TMP_DIST`; }
 `mkdir -p $TMP_DIST`;
 
@@ -28,7 +28,7 @@ my $cnt = `cd $MUTECT_DIR/mutect && git ls-remote --tags -q | grep refs/tags/$mu
 chomp($cnt);
 if ($cnt == 0) { die("ERROR: release tag $mutect_tag does not exist!\n"); }
 system("cd $MUTECT_DIR/mutect && git reset --hard $mutect_tag") == 0 or die();
-`cd $MUTECT_DIR/mutect && git describe | awk '{ print "MuTect Revision: " \$0 }' > $TMP_DIST/version.txt`;
+`cd $MUTECT_DIR/mutect && git describe --tags | awk '{ print "MuTect Revision: " \$0 }' > $TMP_DIST/version.txt`;
 
 my $outputZip = "$cwd/muTect-$mutect_tag-bin.zip";
 if (-e $outputZip) { die("release $outputZip already exists!!\n"); }
@@ -38,7 +38,7 @@ chdir($BASE_DIR);
 system("git clone git\@github.com:broadgsa/gatk-protected.git") == 0 or die();
 chdir($GATK_DIR);
 system("git reset --hard $gatk_tag") == 0 or die();
-`git describe | awk '{ print "GATK Revision: " \$0 }' >> $TMP_DIST/version.txt`;
+`git describe --tags | awk '{ print "GATK Revision: " \$0 }' >> $TMP_DIST/version.txt`;
 
 # do a clean build
 system("cd $GATK_DIR && ant clean") == 0 or die();
