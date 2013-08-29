@@ -94,7 +94,7 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
     @Output(doc="Call-stats output")
     PrintStream out;
 
-    @Output(doc="VCF output of mutation candidates",shortName="vcf", fullName="vcf", required=false)
+    @Output(doc="VCF output of mutation candidates",shortName="vcf", fullName="vcf", required=false, defaultToStdout = false)
     protected VariantContextWriter vcf = null;
 
     /***************************************/
