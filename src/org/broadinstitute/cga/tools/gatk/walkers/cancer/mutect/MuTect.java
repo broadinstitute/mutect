@@ -546,6 +546,7 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
                         strandArtifactPowerCalculator.cachingPowerCalculation(forwardPileup.depthOfCoverage(), candidate.getTumorF())
                 );
 
+                candidate.setStrandContingencyTable(SequenceUtils.getStrandContingencyTable(forwardPileup, reversePileup, (byte) upRef, (byte) altAllele));
 
                 ArrayList<PileupElement> mutantPileupElements = new ArrayList<PileupElement>();
                 ArrayList<PileupElement> referencePileupElements = new ArrayList<PileupElement>();
@@ -581,7 +582,6 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
                 int[] amq = mutantPileup.getMappingQuals();
                 candidate.setTumorAltMaxMapQ((amq.length==0)?0:NumberUtils.max(amq));
 
-                candidate.setStrandContingencyTable(SequenceUtils.getStrandContingencyTable(refPile, mutantPile));
 
                 // start with just the tumor pile
                 candidate.setTumorAltForwardOffsetsInRead(SequenceUtils.getForwardOffsetsInRead(mutantPileup));

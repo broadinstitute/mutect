@@ -9,9 +9,11 @@ my $COSMIC="/xchip/cga/reference/hg19/hg19_cosmic_v54_120711.vcf";
 my $PON="/xchip/cga/reference/hg19/refseq_exome_10bp_hg19_300_1kg_normal_panel.vcf";
 my $MUTECT_JAR="../../gatk-protected/dist/GenomeAnalysisTK.jar";
 my $OUTPUT_DIR="/tmp/regression_trial";
+my $JAVA_OPTS = "";
+#$JAVA_OPTS = "-agentpath:/Applications/jprofiler7/bin/macos/libjprofilerti.jnilib=port=8849";
 
 my $cmd =
-			"mkdir -p $OUTPUT_DIR && java -Xmx1g " .
+			"mkdir -p $OUTPUT_DIR && java -Xmx1g " . $JAVA_OPTS . " " .
 			"-jar $MUTECT_JAR " .
 			"--analysis_type MuTect " .
 			"--reference_sequence $REF " .

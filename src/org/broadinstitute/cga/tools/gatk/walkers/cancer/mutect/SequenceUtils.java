@@ -53,6 +53,7 @@ import net.sf.samtools.CigarElement;
 import net.sf.samtools.CigarOperator;
 import net.sf.samtools.SAMRecord;
 import org.broadinstitute.sting.gatk.contexts.ReferenceContext;
+import org.broadinstitute.sting.utils.BaseUtils;
 import org.broadinstitute.sting.utils.pileup.PileupElement;
 import org.broadinstitute.sting.utils.pileup.ReadBackedPileup;
 
@@ -77,23 +78,21 @@ public class SequenceUtils {
         return sb.toString();
     }
 
-    public static int[] getStrandContingencyTable(LocusReadPile refPile, LocusReadPile mutantPile) {
+    public static int[] getStrandContingencyTable(ReadBackedPileup forwardPile, ReadBackedPileup reversePile, byte ref, byte alt) {
         // Construct a 2x2 contingency table of
-        //            pos     neg
+        //            forward     reverse
         //      REF    a       b
         //      MUT    c       d
         //
         // and return an array of {a,b,c,d}
 
-        int a = 0, b = 0, c = 0, d = 0;
-        for (SAMRecord rec : refPile.finalPileupReads) {
-            if (rec.getReadNegativeStrandFlag()) { b++;} else { a++; }
-        }
-        for (SAMRecord rec : mutantPile.finalPileupReads) {
-            if (rec.getReadNegativeStrandFlag()) { d++;} else { c++; }
-        }
+        int refIdx = BaseUtils.simpleBaseToBaseIndex(ref);
+        int altIdx = BaseUtils.simpleBaseToBaseIndex(alt);
 
-        return new int[]{a,b,c,d};
+        int[] forwardBaseCounts = forwardPile.getBaseCounts();
+        int[] reverseBaseCounts = reversePile.getBaseCounts();
+
+        return new int[]{forwardBaseCounts[refIdx], reverseBaseCounts[refIdx], forwardBaseCounts[altIdx], reverseBaseCounts[altIdx]};
     }
 
 
