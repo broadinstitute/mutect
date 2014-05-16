@@ -24,12 +24,20 @@ BUILD STEPS
 
     # get MuTect source
     git clone git@github.com:broadinstitute/mutect.git
-    cd ..
 
     # get the GATK source and set to the latest tested version
     git clone git@github.com:broadgsa/gatk-protected.git
     cd gatk-protected
-    git reset --hard 2.7-1-g42d771f
+    git reset --hard 3.1 
     
-    # build
-    ant -Dexternal.dir=`pwd`/../mutect-src -Dexecutable=mutect package
+    # build the GATK first and install it to the local mvn repo.  Once GATK publishes to a public repo this will be much simpler
+    mvn -Ddisable.queue install
+
+	# build MuTect and run unit tests (the target jar will be in target/mutect-*.jar)
+	cd ../mutect
+	mvn verify
+	
+	# run integration tests, if you like
+	./run_regression.pl
+	./tieout_regression.pl
+

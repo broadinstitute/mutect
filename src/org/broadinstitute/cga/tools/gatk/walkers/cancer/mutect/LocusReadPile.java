@@ -116,7 +116,8 @@ public class LocusReadPile {
             if (p.getMappingQual() == 0 && !allowMapq0ForQualSum) { continue; }
             if (p.getQual() <= minQSumQualityScore) { continue; }
 
-            if (p.getQual() > this.minQSumQualityScore) { qualitySums.incrementSum((char)p.getBase(), p.getRepresentativeCount(), p.getRepresentativeCount() * p.getQual()); }
+            if (p.getQual() > this.minQSumQualityScore) { qualitySums.incrementSum((char)p.getBase(), 1, p.getQual()); }
+ 
         }
 
         this.finalPileupReads = finalPileup.getReads();
@@ -230,8 +231,12 @@ public class LocusReadPile {
     }
 
     public double calculateAltVsRefLOD(ReadBackedPileup pileup, byte alt, double fAlternate, double fReference) {
-        double lodAlt = LocusReadPile.calculateLogLikelihood(pileup, ((byte) this.refBase), alt, fAlternate);
-        double lodRef = LocusReadPile.calculateLogLikelihood(pileup, ((byte) this.refBase), alt, fReference);
+        return LocusReadPile.calculateAltVsRefLOD(pileup, ((byte) this.refBase), alt, fAlternate, fReference);
+    }
+
+    public static double calculateAltVsRefLOD(ReadBackedPileup pileup, byte ref, byte alt, double fAlternate, double fReference) {
+        double lodAlt = LocusReadPile.calculateLogLikelihood(pileup, ref, alt, fAlternate);
+        double lodRef = LocusReadPile.calculateLogLikelihood(pileup, ref, alt, fReference);
         return lodAlt - lodRef;
     }
 

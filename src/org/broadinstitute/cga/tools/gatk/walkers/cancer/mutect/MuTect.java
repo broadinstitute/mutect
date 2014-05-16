@@ -199,7 +199,7 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
         //setting version info
         // TODO: refactor into getMuTectVersion()
         final String gatkVersion = CommandLineGATK.getVersionNumber();
-        ResourceBundle resources = TextFormattingUtils.loadResourceBundle("CGAText");
+        ResourceBundle resources = TextFormattingUtils.loadResourceBundle("MuTectText");
         final String mutectVersion = resources.containsKey("version")? resources.getString("version") : "<unknown>";        
         final String combinedVersion = "MuTect:"+mutectVersion+" Gatk:"+gatkVersion;
 
