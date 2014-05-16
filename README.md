@@ -14,7 +14,7 @@ How to build MuTect
 
 PREREQUISITES
 
-To compile MuTect you must be using Java 1.7 and Ant 1.8.  In addition, In addition, it is necessary to download the Apache BCEL Library and put it in either your system classpath, or your Ant installation lib directory.  After building successfully, the MuTect JAR file will be in mutect-src/gatk-protected/dist/packages/muTect-*/muTect.jar 
+To compile MuTect you must be using Java 1.7 and Maven 3.0+.  After building successfully, the MuTect JAR file will be in mutect/target/mutect-*.jar
 
 BUILD STEPS
 
