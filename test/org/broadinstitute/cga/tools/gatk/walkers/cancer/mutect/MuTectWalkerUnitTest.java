@@ -30,23 +30,11 @@ public class MuTectWalkerUnitTest extends BaseTest {
     public byte ref = 'A';
     public byte alt = 'T';
 
-    // example genome loc parser for this test, can be deleted if you don't use the reference
-    private GenomeLocParser genomeLocParser;
-
-    // example fasta index file, can be deleted if you don't use the reference
-    private IndexedFastaSequenceFile seq;
-
-    @BeforeClass
-    public void setup() throws FileNotFoundException {
-        // sequence
-        seq = new CachingIndexedFastaSequenceFile(new File(hg19Reference));
-        genomeLocParser = new GenomeLocParser(seq);
-    }
-
     @Test
     public void basicPileupTest() {
-        final SAMFileHeader header = ArtificialSAMUtils.createArtificialSamHeader(seq.getSequenceDictionary());
-        final GenomeLoc myLocation = genomeLocParser.createGenomeLoc("1", 10);
+        final SAMFileHeader header = ArtificialSAMUtils.createArtificialSamHeader(5, 1, 10000);
+        GenomeLocParser genomeLocParser = new GenomeLocParser(header.getSequenceDictionary());
+        final GenomeLoc myLocation = genomeLocParser.createGenomeLoc("chr1", 10);
 
         final int pileupSize = 100;
         final int readLength = 10;
