@@ -5,7 +5,7 @@
     <groupId>org.broadinstitute.cga</groupId>
     <artifactId>mutect</artifactId>
     <packaging>jar</packaging>
-    <version>1.1.7</version>
+    <version>1.1.8</version>
     <name>Mutect</name>
 
     <properties>
