@@ -65,8 +65,18 @@ public class VCFGenerator {
     public static Set<VCFHeaderLine> getVCFHeaderInfo() {
         Set<VCFHeaderLine> headerInfo = new HashSet<VCFHeaderLine>();
 
-
-        headerInfo.add(new VCFFilterHeaderLine("REJECT", "Rejected as a confident somatic mutation"));
+        headerInfo.add(new VCFFilterHeaderLine("triallelic_site", "Triallelic sites generate false positives, and are currently filtered out by default"));
+        headerInfo.add(new VCFFilterHeaderLine("fstar_tumor_lod", ""));
+        headerInfo.add(new VCFFilterHeaderLine("nearby_gap_events", "Nearby misaligned small insertion and deletion events"));
+        headerInfo.add(new VCFFilterHeaderLine("possible_contamination", ""));
+        headerInfo.add(new VCFFilterHeaderLine("germline_risk", ""));
+        headerInfo.add(new VCFFilterHeaderLine("normal_lod", ""));
+        headerInfo.add(new VCFFilterHeaderLine("alt_allele_in_normal", "ALT allele observed in control"));
+        headerInfo.add(new VCFFilterHeaderLine("clustered_read_position", ""));
+        headerInfo.add(new VCFFilterHeaderLine("strand_artifact", "Majority of ALT alleles are observed in a single direction of reads"));
+        headerInfo.add(new VCFFilterHeaderLine("poor_mapping_region_mapq0", "≥50% reads in tumor and normal have a mapping quality of zero"));
+        headerInfo.add(new VCFFilterHeaderLine("poor_mapping_region_alternate_allele_mapq", "No ALT allele reads with mapping quality score ≥ 20"));
+        headerInfo.add(new VCFFilterHeaderLine("seen_in_panel_of_normals", "Present in two or more normal samples"));
         headerInfo.add(new VCFFilterHeaderLine("PASS", "Accept as a confident somatic mutation"));
 
         // TODO: what fields do we need here
@@ -121,7 +131,7 @@ public class VCFGenerator {
         VariantContextBuilder vc =
                 new VariantContextBuilder("", l.getContig(), l.getStart(), l.getStop(), alleles);
 
-        vc.filter(m.isRejected()?"REJECT":"PASS");
+        vc.filters( m.isRejected() ? new HashSet<String>(m.getRejectionReasons()) : new HashSet<String>(Arrays.asList("PASS")));
         if(m.getDbsnpVC() != null) {
             vc.id(m.getDbsnpVC().getID());
             vc.attribute(VCFConstants.DBSNP_KEY, null);
