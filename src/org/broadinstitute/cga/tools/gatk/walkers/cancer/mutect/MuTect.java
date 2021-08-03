@@ -789,6 +789,12 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
                 continue;
             }
 
+            // is this a discordant read pair?
+            // TODO: add option to disable this filter
+            if(read.getMateReferenceIndex() != read.getReferenceIndex()) {
+                continue;
+            }
+
             // was this read ONLY placed because its mate was uniquely placed? (supplied by BWA)
             if (filterMateRescueReads && MAPPED_BY_MATE.equals(read.getAttribute("XT"))) {
                 continue;
