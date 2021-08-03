@@ -789,7 +789,7 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
                 continue;
             }
 
-            // was this read ONLY placed because it's mate was uniquely placed? (supplied by BWA)
+            // was this read ONLY placed because its mate was uniquely placed? (supplied by BWA)
             if (filterMateRescueReads && MAPPED_BY_MATE.equals(read.getAttribute("XT"))) {
                 continue;
             }
@@ -797,7 +797,7 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
             int mismatchQualitySum =
                     CGAAlignmentUtils.mismatchesInRefWindow(p, ref, false, true);
 
-            // do we have to many mismatches overall?
+            // do we have too many mismatches overall?
             if (mismatchQualitySum > this.MAX_READ_MISMATCH_QUALITY_SCORE_SUM) {
                 continue;
             }
