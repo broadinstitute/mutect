@@ -784,14 +784,6 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
         for ( PileupElement p : pile ) {
             final GATKSAMRecord read = p.getRead();
 
-            int mismatchQualitySum =
-                    CGAAlignmentUtils.mismatchesInRefWindow(p, ref, false, true);
-
-            // do we have to many mismatches overall?
-            if (mismatchQualitySum > this.MAX_READ_MISMATCH_QUALITY_SCORE_SUM) {
-                continue;
-            }
-
             // is this a heavily clipped read?
             if (SequenceUtils.isReadHeavilySoftClipped(read, MTAC.HEAVILY_CLIPPED_READ_FRACTION)) {
                 continue;
@@ -799,6 +791,14 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
 
             // was this read ONLY placed because it's mate was uniquely placed? (supplied by BWA)
             if (filterMateRescueReads && MAPPED_BY_MATE.equals(read.getAttribute("XT"))) {
+                continue;
+            }
+
+            int mismatchQualitySum =
+                    CGAAlignmentUtils.mismatchesInRefWindow(p, ref, false, true);
+
+            // do we have to many mismatches overall?
+            if (mismatchQualitySum > this.MAX_READ_MISMATCH_QUALITY_SCORE_SUM) {
                 continue;
             }
 
