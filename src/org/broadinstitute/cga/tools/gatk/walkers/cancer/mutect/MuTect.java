@@ -791,7 +791,7 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
 
             // is this a discordant read pair?
             // TODO: add option to disable this filter
-            if(read.getMateReferenceIndex() != read.getReferenceIndex()) {
+            if(MTAC.EXCLUDE_CHIMERIC_READS && read.getMateReferenceIndex() != read.getReferenceIndex()) {
                 continue;
             }
 
