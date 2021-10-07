@@ -130,6 +130,15 @@ public class MuTectArgumentCollection {
     @Argument(fullName = "heavily_clipped_read_fraction", required = false, doc = "if this fraction or more of the bases in a read are soft/hard clipped, do not use this read for mutation calling")
     public float HEAVILY_CLIPPED_READ_FRACTION = 0.30f;
 
+    @Argument(fullName = "mismatchQualitySumfilter", required = false, doc = "if true, apply mismatchQualitySum filter")
+    public boolean MISMATCHQUALITYSUMFILTER = false;
+    
+    @Argument(fullName = "heavilyClippedfilter", required = false, doc = "if true, apply heavySoftClipping filter")
+    public boolean HEAVILYCLIPPEDFILTER = false;
+
+    @Argument(fullName = "mappedbyMatefilter", required = false, doc = "if true, apply mappedbyMate filter")
+    public boolean MAPPEDBYMATEFILTER = false;
+
     @Argument(fullName = "fraction_mapq0_threshold", required = false, doc = "threshold for determining if there is relatedness between the alt and ref allele read piles")
     public float FRACTION_MAPQ0_THRESHOLD = 0.5f;
 

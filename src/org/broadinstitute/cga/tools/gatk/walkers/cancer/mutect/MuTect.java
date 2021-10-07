@@ -508,7 +508,7 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
                 candidate.setInitialNormalReadDepth(normalReadPile.finalPileupReads.size());
 
                 // TODO: parameterize filtering Mate-Rescued Reads (if someone wants to disable this)
-                final LocusReadPile t2 = filterReads(ref, tumorReadPile.finalPileup, true);
+                final LocusReadPile t2 = filterReads(ref, tumorReadPile.finalPileup);
 
                 // if there are no reads remaining, abandon this theory
                 if ( !MTAC.FORCE_OUTPUT && t2.finalPileupReads.size() == 0) { continue; }
@@ -778,7 +778,7 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
     private static Character MAPPED_BY_MATE = 'M';
     IndexedFastaSequenceFile refReader;
 
-    private LocusReadPile filterReads(final ReferenceContext ref, final ReadBackedPileup pile, boolean filterMateRescueReads) {
+    private LocusReadPile filterReads(final ReferenceContext ref, final ReadBackedPileup pile) {
         ArrayList<PileupElement> newPileupElements = new ArrayList<PileupElement>();
 
         for ( PileupElement p : pile ) {
@@ -788,17 +788,17 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
                     CGAAlignmentUtils.mismatchesInRefWindow(p, ref, false, true);
 
             // do we have to many mismatches overall?
-            if (mismatchQualitySum > this.MAX_READ_MISMATCH_QUALITY_SCORE_SUM) {
+            if (MTAC.MISMATCHQUALITYSUMFILTER && mismatchQualitySum > this.MAX_READ_MISMATCH_QUALITY_SCORE_SUM) {
                 continue;
             }
 
             // is this a heavily clipped read?
-            if (SequenceUtils.isReadHeavilySoftClipped(read, MTAC.HEAVILY_CLIPPED_READ_FRACTION)) {
+            if (MTAC.HEAVILYCLIPPEDFILTER && SequenceUtils.isReadHeavilySoftClipped(read, MTAC.HEAVILY_CLIPPED_READ_FRACTION)) {
                 continue;
             }
 
             // was this read ONLY placed because it's mate was uniquely placed? (supplied by BWA)
-            if (filterMateRescueReads && MAPPED_BY_MATE.equals(read.getAttribute("XT"))) {
+            if (MTAC.MAPPEDBYMATEFILTER && MAPPED_BY_MATE.equals(read.getAttribute("XT"))) {
                 continue;
             }
 
