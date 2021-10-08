@@ -530,11 +530,11 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
                 candidate.setTumorLodFStar(tumorLod2);
 
                 //TODO: clean up use of forward/reverse vs positive/negative (prefer the latter since GATK uses it)
-                ReadBackedPileup forwardPileup = filterReads(ref, tumorReadPile.finalPileupPositiveStrand, true).finalPileupPositiveStrand;
+                ReadBackedPileup forwardPileup = filterReads(ref, tumorReadPile.finalPileupPositiveStrand).finalPileupPositiveStrand;
                 double f2forward = LocusReadPile.estimateAlleleFraction(forwardPileup, upRef, altAllele);
                 candidate.setTumorLodFStarForward(t2.calculateAltVsRefLOD(forwardPileup, (byte)altAllele, f2forward, 0.0));
 
-                ReadBackedPileup reversePileup = filterReads(ref,tumorReadPile.finalPileupNegativeStrand, true).finalPileupNegativeStrand;
+                ReadBackedPileup reversePileup = filterReads(ref,tumorReadPile.finalPileupNegativeStrand).finalPileupNegativeStrand;
                 double f2reverse = LocusReadPile.estimateAlleleFraction(reversePileup, upRef, altAllele);
                 candidate.setTumorLodFStarReverse(t2.calculateAltVsRefLOD(reversePileup, (byte)altAllele, f2reverse, 0.0));
 
