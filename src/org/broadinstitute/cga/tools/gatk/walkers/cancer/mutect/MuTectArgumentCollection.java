@@ -130,6 +130,9 @@ public class MuTectArgumentCollection {
     @Argument(fullName = "heavily_clipped_read_fraction", required = false, doc = "if this fraction or more of the bases in a read are soft/hard clipped, do not use this read for mutation calling")
     public float HEAVILY_CLIPPED_READ_FRACTION = 0.30f;
 
+    @Argument(fullName = "max_read_mismatch_quality_score_sum", 'required = false, doc = "if the sum of non-reference base qualities on a read is greater than this value, filter the read")
+    public int MAX_READ_MISMATCH_QUALITY_SCORE_SUM = 150;
+    
     @Argument(fullName = "mismatchQualitySumfilter", required = false, doc = "if true, apply mismatchQualitySum filter")
     public boolean MISMATCHQUALITYSUMFILTER = false;
     

@@ -774,7 +774,6 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
         return result;
     }
 
-    int MAX_READ_MISMATCH_QUALITY_SCORE_SUM = 100;
     private static Character MAPPED_BY_MATE = 'M';
     IndexedFastaSequenceFile refReader;
 
@@ -788,7 +787,7 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
                     CGAAlignmentUtils.mismatchesInRefWindow(p, ref, false, true);
 
             // do we have to many mismatches overall?
-            if (MTAC.MISMATCHQUALITYSUMFILTER && mismatchQualitySum > this.MAX_READ_MISMATCH_QUALITY_SCORE_SUM) {
+            if (MTAC.MISMATCHQUALITYSUMFILTER && mismatchQualitySum > MTAC.MAX_READ_MISMATCH_QUALITY_SCORE_SUM) {
                 continue;
             }
 
