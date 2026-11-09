@@ -56,7 +56,6 @@ import org.broadinstitute.sting.utils.genotyper.DiploidGenotype;
 import org.broadinstitute.sting.utils.pileup.PileupElement;
 import org.broadinstitute.sting.utils.pileup.ReadBackedPileup;
 import org.broadinstitute.sting.utils.pileup.ReadBackedPileupImpl;
-import org.broadinstitute.sting.utils.sam.GATKSAMRecord;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -67,9 +66,6 @@ import static java.lang.Math.pow;
 
 public class LocusReadPile {
     protected ReadBackedPileup pileup;
-    List<GATKSAMRecord> finalPileupReads;
-    List<Integer> finalPileupOffsets;
-
     protected char refBase;
     protected int minQualityScore;
     protected int minQSumQualityScore;
@@ -80,12 +76,24 @@ public class LocusReadPile {
     public ReadBackedPileup finalPileup;
 
 
-    public ReadBackedPileup finalPileupPositiveStrand;
-    public ReadBackedPileup finalPileupNegativeStrand;
+    // the strand-specific pileups and the gap event counts are only needed for sites that become
+    // candidates, so they are computed on first use rather than at every locus
+    private ReadBackedPileup finalPileupPositiveStrand;
+    private ReadBackedPileup finalPileupNegativeStrand;
 
     public static final int GAP_EVENT_PROXIMITY = 5; // a 11bp window
+    private ReadBackedPileup noOverlapPileup;
+    private boolean gapEventsCounted = false;
     protected int deletionsCount = 0;
     protected int insertionsCount = 0;
+
+    // error probability for each (non-negative) phred quality score
+    private static final double[] QUAL_TO_ERROR_PROB = new double[Byte.MAX_VALUE + 1];
+    static {
+        for (int qual = 0; qual < QUAL_TO_ERROR_PROB.length; qual++) {
+            QUAL_TO_ERROR_PROB[qual] = pow(10, (qual / -10.0));
+        }
+    }
 
     public LocusReadPile(ReadBackedPileup pileup, char refBase, int minQualityScore, int minQSumQualityScore, boolean trackBaseQualityScores) {
         this(pileup, refBase, minQualityScore, minQSumQualityScore, false, false, trackBaseQualityScores);
@@ -98,7 +106,6 @@ public class LocusReadPile {
         this.minQSumQualityScore = minQSumQualityScore;
         this.minQualityScore = minQualityScore;
 
-        ReadBackedPileup noOverlapPileup;
         if (!retainOverlapMismatches) {
             noOverlapPileup = getOverlappingFragmentFilteredPileup(pileup, (byte) refBase);
         } else {
@@ -108,10 +115,6 @@ public class LocusReadPile {
         this.qualityScoreFilteredPileup = initialPileup.getBaseFilteredPileup(minQualityScore);
         this.finalPileup = qualityScoreFilteredPileup.getPileupWithoutMappingQualityZeroReads();
 
-        // apply the same process to derive the strand-specific pileups but in this case don't disregard the overlaps
-        this.finalPileupPositiveStrand = pileup.getPileupWithoutDeletions().getBaseFilteredPileup(minQualityScore).getPileupWithoutMappingQualityZeroReads().getPositiveStrandPileup();
-        this.finalPileupNegativeStrand = pileup.getPileupWithoutDeletions().getBaseFilteredPileup(minQualityScore).getPileupWithoutMappingQualityZeroReads().getNegativeStrandPileup();
-
         for (PileupElement p : qualityScoreFilteredPileup) {
             if (p.getMappingQual() == 0 && !allowMapq0ForQualSum) { continue; }
             if (p.getQual() <= minQSumQualityScore) { continue; }
@@ -120,10 +123,41 @@ public class LocusReadPile {
  
         }
 
-        this.finalPileupReads = finalPileup.getReads();
-        this.finalPileupOffsets = finalPileup.getOffsets();
+    }
 
-        // calculate how many are at this site and how many insertions are within INSERTION_PROXIMITY bp
+    /**
+     * @return the number of reads in the final pileup
+     */
+    public int getFinalPileupDepth() {
+        return finalPileup.getNumberOfElements();
+    }
+
+    /**
+     * Applies the same process used to derive the final pileup, but without disregarding the overlaps
+     */
+    public static ReadBackedPileup getStrandIndependentFilteredPileup(ReadBackedPileup pileup, int minQualityScore) {
+        return pileup.getPileupWithoutDeletions().getBaseFilteredPileup(minQualityScore).getPileupWithoutMappingQualityZeroReads();
+    }
+
+    public ReadBackedPileup getFinalPileupPositiveStrand() {
+        if (finalPileupPositiveStrand == null) {
+            finalPileupPositiveStrand = getStrandIndependentFilteredPileup(pileup, minQualityScore).getPositiveStrandPileup();
+        }
+        return finalPileupPositiveStrand;
+    }
+
+    public ReadBackedPileup getFinalPileupNegativeStrand() {
+        if (finalPileupNegativeStrand == null) {
+            finalPileupNegativeStrand = getStrandIndependentFilteredPileup(pileup, minQualityScore).getNegativeStrandPileup();
+        }
+        return finalPileupNegativeStrand;
+    }
+
+    // calculate how many deletions are at this site and how many gap events are within GAP_EVENT_PROXIMITY bp
+    private void countGapEvents() {
+        if (gapEventsCounted) { return; }
+        gapEventsCounted = true;
+
         for (PileupElement p : noOverlapPileup) {
             if (p.getBase() == PileupElement.DELETION_BASE) {
                 deletionsCount++;
@@ -149,7 +183,6 @@ public class LocusReadPile {
                 }
             }
         }
-
     }
 
     public static ReadBackedPileup getOverlappingFragmentFilteredPileupButPreferMismatches(ReadBackedPileup rbp, byte ref) {
@@ -171,11 +204,12 @@ public class LocusReadPile {
             String readName = p.getRead().getReadName();
 
             // if we've never seen this read before, life is good
-            if (!filteredPileup.containsKey(readName)) {
+            final Integer existingIndexOrNull = filteredPileup.get(readName);
+            if (existingIndexOrNull == null) {
                 filteredPileup.put(readName, i);
                 elementsToKeep[i] = true;
             } else {
-                int existingIndex = filteredPileup.get(readName);
+                int existingIndex = existingIndexOrNull;
                 PileupElement existing = listOfElements[existingIndex];
 
                 // if the reads disagree at this position...
@@ -207,8 +241,7 @@ public class LocusReadPile {
 
         List<PileupElement> sortedList = new ArrayList<PileupElement>(rbp.getNumberOfElements());
         for(int j=0; j<elementsToKeep.length; j++) {
-            Boolean b = elementsToKeep[j];
-            if (b != null && b ) { sortedList.add(listOfElements[j]); }
+            if (elementsToKeep[j]) { sortedList.add(listOfElements[j]); }
         }
 
         return new ReadBackedPileupImpl(rbp.getLocation(), sortedList);
@@ -248,22 +281,44 @@ public class LocusReadPile {
         return -1*calculateAltVsRefLOD(pileup, alt, fAlternate, fReference);
     }
 
+    private static final int REF_TERM = 0;
+    private static final int ALT_TERM = 1;
+    private static final int OTHER_TERM = 2;
+
+    private static double logLikelihoodTerm(int termType, double e, double f) {
+        if (termType == REF_TERM) {
+            return Math.log10(f*e/3 + (1-f)*(1-e));
+        } else if (termType == ALT_TERM) {
+            return Math.log10(f*(1-e) + (1-f)*e/3);
+        } else {
+            return Math.log10(2*e/3);
+        }
+    }
+
     static public double calculateLogLikelihood(ReadBackedPileup pileup, byte ref, byte alt, double f) {
+        // the contribution of a read depends only on its base (ref, alt or other) and quality score, so
+        // each distinct term is calculated once and reused.  The terms are still summed read by read
+        // in pileup order so the result is exactly the same as calculating each one individually
+        final int numQuals = QUAL_TO_ERROR_PROB.length;
+        final double[] terms = new double[3 * numQuals];
+        final boolean[] termCalculated = new boolean[3 * numQuals];
 
         double ll = 0;
         for(PileupElement pe : pileup) {
             byte base = pe.getBase();
             byte qual = pe.getQual();
-            double e = pow(10, (qual / -10.0));
+            final int termType = (base == ref) ? REF_TERM : ((base == alt) ? ALT_TERM : OTHER_TERM);
 
-            if (base == ref) {
-                ll += Math.log10(f*e/3 + (1-f)*(1-e));
-            } else if (base == alt) {
-                ll += Math.log10(f*(1-e) + (1-f)*e/3);
+            if (qual >= 0) {
+                final int idx = termType * numQuals + qual;
+                if (!termCalculated[idx]) {
+                    terms[idx] = logLikelihoodTerm(termType, QUAL_TO_ERROR_PROB[qual], f);
+                    termCalculated[idx] = true;
+                }
+                ll += terms[idx];
             } else {
-                ll += Math.log10(2*e/3);
+                ll += logLikelihoodTerm(termType, pow(10, (qual / -10.0)), f);
             }
-
         }
         return ll;
     }
@@ -287,7 +342,12 @@ public class LocusReadPile {
     }
 
     public int getFilteredBaseCount(int minBaseQualityScore) {
-        return this.finalPileup.getBaseFilteredPileup(minBaseQualityScore).depthOfCoverage();
+        // equivalent to finalPileup.getBaseFilteredPileup(minBaseQualityScore).depthOfCoverage(), without building the pileup
+        int count = 0;
+        for (PileupElement p : this.finalPileup) {
+            if (p.isDeletion() || p.getQual() >= minBaseQualityScore) { count++; }
+        }
+        return count;
     }
 
     public DiploidGenotype getBestGenotype(VariableAllelicRatioGenotypeLikelihoods likelihoods) {
@@ -380,10 +440,12 @@ public class LocusReadPile {
 
 
     public int getDeletionsCount() {
+        countGapEvents();
         return deletionsCount;
     }
 
     public int getInsertionsCount() {
+        countGapEvents();
         return insertionsCount;
     }
 }

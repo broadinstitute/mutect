@@ -62,6 +62,14 @@ public class VariableAllelicRatioGenotypeLikelihoods extends DiploidSNPGenotypeL
     protected double logHalf;
     protected char ref;
 
+    // The likelihoods contributed by a single observation depend only on the observed base, its quality score
+    // and (for the genotype likelihoods) the ref and f of this instance.  Pileups contain many observations
+    // with the same base and quality, so remember the result for each rather than recalculating it.
+    private DiploidSNPGenotypeLikelihoods[][] singleObservationCache;
+
+    // the four-base likelihoods do not depend on ref or f, so they are shared across all instances
+    private static final double[][][] FOUR_BASE_LIKELIHOODS_CACHE = new double[BaseUtils.BASES.length][Byte.MAX_VALUE + 1][];
+
 
     /**
      * Create a new GenotypeLikelhoods object with flat priors for each diploid genotype
@@ -82,12 +90,63 @@ public class VariableAllelicRatioGenotypeLikelihoods extends DiploidSNPGenotypeL
         return getLikelihoods()[g.ordinal()];
     }
 
+    /**
+     * @return the index to use when remembering results for this observed base, or -1 if results for it are
+     * not remembered.  The likelihood calculations compare the observed base to the upper case bases exactly,
+     * so only those are remembered (a lower case base is not interchangeable with its upper case equivalent)
+     */
+    private static int cacheIndexOfBase(byte observedBase) {
+        for (int i = 0; i < BaseUtils.BASES.length; i++) {
+            if (BaseUtils.BASES[i] == observedBase) { return i; }
+        }
+        return -1;
+    }
+
+    @Override
+    protected DiploidSNPGenotypeLikelihoods calculateCachedGenotypeLikelihoods(byte observedBase1, byte qualityScore1, byte observedBase2, byte qualityScore2, int ploidy) {
+        final int baseIndex = cacheIndexOfBase(observedBase1);
+
+        // only single observations of a regular base are remembered
+        if (qualityScore2 != 0 || baseIndex < 0 || qualityScore1 < 0) {
+            return calculateGenotypeLikelihoods(observedBase1, qualityScore1, observedBase2, qualityScore2);
+        }
+
+        if (singleObservationCache == null) {
+            singleObservationCache = new DiploidSNPGenotypeLikelihoods[BaseUtils.BASES.length][];
+        }
+        if (singleObservationCache[baseIndex] == null) {
+            singleObservationCache[baseIndex] = new DiploidSNPGenotypeLikelihoods[Byte.MAX_VALUE + 1];
+        }
+
+        DiploidSNPGenotypeLikelihoods gl = singleObservationCache[baseIndex][qualityScore1];
+        if (gl == null) {
+            gl = calculateGenotypeLikelihoods(observedBase1, qualityScore1, observedBase2, qualityScore2);
+            singleObservationCache[baseIndex][qualityScore1] = gl;
+        }
+        return gl;
+    }
+
+    private double[] cachingComputeLog10Likelihoods(byte observedBase1, byte qualityScore1, byte observedBase2, byte qualityScore2) {
+        final int baseIndex = cacheIndexOfBase(observedBase1);
+        if (qualityScore2 != 0 || baseIndex < 0 || qualityScore1 < 0) {
+            return computeLog10Likelihoods(observedBase1, qualityScore1, observedBase2, qualityScore2);
+        }
+
+        double[] log10FourBaseLikelihoods = FOUR_BASE_LIKELIHOODS_CACHE[baseIndex][qualityScore1];
+        if (log10FourBaseLikelihoods == null) {
+            log10FourBaseLikelihoods = computeLog10Likelihoods(observedBase1, qualityScore1, observedBase2, qualityScore2);
+            FOUR_BASE_LIKELIHOODS_CACHE[baseIndex][qualityScore1] = log10FourBaseLikelihoods;
+        }
+        return log10FourBaseLikelihoods;
+    }
+
     protected DiploidSNPGenotypeLikelihoods calculateGenotypeLikelihoods(byte observedBase1, byte qualityScore1, byte observedBase2, byte qualityScore2) {
-        double[] log10FourBaseLikelihoods = computeLog10Likelihoods(observedBase1, qualityScore1, observedBase2, qualityScore2);
+        double[] log10FourBaseLikelihoods = cachingComputeLog10Likelihoods(observedBase1, qualityScore1, observedBase2, qualityScore2);
 
         try {
 
             VariableAllelicRatioGenotypeLikelihoods gl = (VariableAllelicRatioGenotypeLikelihoods)this.clone();
+            gl.singleObservationCache = null;
             gl.setToZero();
 
             for ( DiploidGenotype g : DiploidGenotype.values() ) {

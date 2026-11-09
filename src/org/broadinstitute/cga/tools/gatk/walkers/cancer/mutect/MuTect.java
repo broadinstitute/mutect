@@ -331,9 +331,6 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
         // an optimization to speed things up when there is no coverage
         if ( !MTAC.FORCE_OUTPUT && numberOfReads == 0) { return -1; }
 
-        // get sequence context around mutation
-        String sequenceContext = SequenceUtils.createSequenceContext(ref, 3);
-
         // only process bases where the reference is [ACGT], because the FASTA for HG18 has N,M and R!
         final char upRef = Character.toUpperCase(ref.getBaseAsChar());
         if (upRef != 'A' && upRef != 'C' && upRef != 'G' && upRef != 'T') {
@@ -363,8 +360,8 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
                 normalCoveredDepthThreshold = 0;
             }
 
-            int tumorBaseCount = tumorReadPile.finalPileupReads.size();
-            int normalBaseCount = normalReadPile.finalPileupReads.size();
+            int tumorBaseCount = tumorReadPile.getFinalPileupDepth();
+            int normalBaseCount = normalReadPile.getFinalPileupDepth();
             boolean isTumorCovered = tumorBaseCount >= tumorCoveredDepthThreshold;
             boolean isNormalCovered = normalBaseCount >= normalCoveredDepthThreshold;
             boolean isBaseCovered = isTumorCovered && isNormalCovered;
@@ -403,10 +400,24 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
                     tumorReadPile.qualityScoreFilteredPileup.depthOfCoverage() +
                             normalReadPile.qualityScoreFilteredPileup.depthOfCoverage();
 
+            // the following do not depend on the alternate allele being tested, so they are calculated
+            // at most once per locus, the first time a candidate needs them
+            String sequenceContext = null;
+            VariableAllelicRatioGenotypeLikelihoods normalGl = null;
+            LocusReadPile t2 = null;
+            ReadBackedPileup forwardPileup = null;
+            ReadBackedPileup reversePileup = null;
+            final Map<GATKSAMRecord, Boolean> readFilterCache = new IdentityHashMap<GATKSAMRecord, Boolean>();
+
             // Test each of the possible alternate alleles
             for (final char altAllele : new char[]{'A','C','G','T'}) {
                 if (altAllele == upRef) { continue; }
                 if (!MTAC.FORCE_OUTPUT && tumorReadPile.qualitySums.getCounts(altAllele) == 0) { continue; }
+
+                // get sequence context around mutation
+                if (sequenceContext == null) {
+                    sequenceContext = SequenceUtils.createSequenceContext(ref, 3);
+                }
 
                 CandidateMutation candidate = new CandidateMutation(rawContext.getLocation(), upRef);
                 candidate.setSequenceContext(sequenceContext);
@@ -447,7 +458,7 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
                 double tumorLod = tumorReadPile.calculateAltVsRefLOD((byte)altAllele, candidate.getTumorF(), 0);
                 candidate.setTumorLodFStar(tumorLod);
 
-                candidate.setInitialTumorReadDepth(tumorReadPile.finalPileupReads.size());
+                candidate.setInitialTumorReadDepth(tumorReadPile.getFinalPileupDepth());
                 candidate.setTumorInsertionCount(tumorReadPile.getInsertionsCount());
                 candidate.setTumorDeletionCount(tumorReadPile.getDeletionsCount());
 
@@ -488,7 +499,9 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
                 final QualitySums normQs = normalReadPile.qualitySums;
 
 
-                VariableAllelicRatioGenotypeLikelihoods normalGl = normalReadPile.calculateLikelihoods(normalReadPile.qualityScoreFilteredPileup); // use MAPQ0 reads
+                if (normalGl == null) {
+                    normalGl = normalReadPile.calculateLikelihoods(normalReadPile.qualityScoreFilteredPileup); // use MAPQ0 reads
+                }
                 candidate.setInitialNormalBestGenotype(normalReadPile.getBestGenotype(normalGl));
                 candidate.setInitialNormalLod(LocusReadPile.getRefVsAlt(normalGl, upRef, altAllele));
 
@@ -505,13 +518,15 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
 
                 candidate.setInitialNormalAltCounts(normQs.getCounts(altAllele));
                 candidate.setInitialNormalRefCounts(normQs.getCounts(upRef));
-                candidate.setInitialNormalReadDepth(normalReadPile.finalPileupReads.size());
+                candidate.setInitialNormalReadDepth(normalReadPile.getFinalPileupDepth());
 
                 // TODO: parameterize filtering Mate-Rescued Reads (if someone wants to disable this)
-                final LocusReadPile t2 = filterReads(ref, tumorReadPile.finalPileup, true);
+                if (t2 == null) {
+                    t2 = new LocusReadPile(filterReads(ref, tumorReadPile.finalPileup, true, readFilterCache), (char)ref.getBase(), 0, 0, MTAC.ENABLE_QSCORE_OUTPUT);
+                }
 
                 // if there are no reads remaining, abandon this theory
-                if ( !MTAC.FORCE_OUTPUT && t2.finalPileupReads.size() == 0) { continue; }
+                if ( !MTAC.FORCE_OUTPUT && t2.getFinalPileupDepth() == 0) { continue; }
 
                 candidate.setInitialTumorAltCounts(t2.qualitySums.getCounts(altAllele));
                 candidate.setInitialTumorRefCounts(t2.qualitySums.getCounts(upRef));
@@ -523,18 +538,24 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
 
                 VariableAllelicRatioGenotypeLikelihoods t2Gl = t2.calculateLikelihoods(t2.finalPileup);
                 candidate.setInitialTumorLod(t2.getAltVsRef(t2Gl, upRef, altAllele));
-                candidate.setInitialTumorReadDepth(t2.finalPileupReads.size());
+                candidate.setInitialTumorReadDepth(t2.getFinalPileupDepth());
 
                 candidate.setTumorF(t2.estimateAlleleFraction(upRef, altAllele));
                 double tumorLod2 = t2.calculateAltVsRefLOD((byte)altAllele, candidate.getTumorF(), 0);
                 candidate.setTumorLodFStar(tumorLod2);
 
                 //TODO: clean up use of forward/reverse vs positive/negative (prefer the latter since GATK uses it)
-                ReadBackedPileup forwardPileup = filterReads(ref, tumorReadPile.finalPileupPositiveStrand, true).finalPileupPositiveStrand;
+                if (forwardPileup == null) {
+                    forwardPileup = LocusReadPile.getStrandIndependentFilteredPileup(
+                            filterReads(ref, tumorReadPile.getFinalPileupPositiveStrand(), true, readFilterCache), 0).getPositiveStrandPileup();
+                }
                 double f2forward = LocusReadPile.estimateAlleleFraction(forwardPileup, upRef, altAllele);
                 candidate.setTumorLodFStarForward(t2.calculateAltVsRefLOD(forwardPileup, (byte)altAllele, f2forward, 0.0));
 
-                ReadBackedPileup reversePileup = filterReads(ref,tumorReadPile.finalPileupNegativeStrand, true).finalPileupNegativeStrand;
+                if (reversePileup == null) {
+                    reversePileup = LocusReadPile.getStrandIndependentFilteredPileup(
+                            filterReads(ref, tumorReadPile.getFinalPileupNegativeStrand(), true, readFilterCache), 0).getNegativeStrandPileup();
+                }
                 double f2reverse = LocusReadPile.estimateAlleleFraction(reversePileup, upRef, altAllele);
                 candidate.setTumorLodFStarReverse(t2.calculateAltVsRefLOD(reversePileup, (byte)altAllele, f2reverse, 0.0));
 
@@ -553,12 +574,12 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
 
 
                 for (PileupElement p : t2.finalPileup) {
-                    final SAMRecord read = p.getRead();
-                    final int offset = p.getOffset();
+                    // the base in the read at this position (equivalent to read.getReadString().charAt(offset))
+                    final char readBase = (char) (p.getRead().getReadBases()[p.getOffset()] & 0xFF);
 
-                    if (read.getReadString().charAt(offset) == altAllele) {
+                    if (readBase == altAllele) {
                         mutantPileupElements.add(p);
-                    } else if (read.getReadString().charAt(offset) == upRef) {
+                    } else if (readBase == upRef) {
                         referencePileupElements.add(p);
                     } else {
                         // just drop the read...
@@ -570,10 +591,6 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
 
                 ReadBackedPileup referencePileup =
                         new ReadBackedPileupImpl(rawContext.getLocation(), referencePileupElements);
-
-                // TODO: shouldn't this be refAllele here?
-                final LocusReadPile mutantPile = new LocusReadPile(mutantPileup, altAllele, 0, 0, MTAC.ENABLE_QSCORE_OUTPUT);
-                final LocusReadPile refPile =  new LocusReadPile(referencePileup, altAllele, 0, 0, MTAC.ENABLE_QSCORE_OUTPUT);
 
                 // Set the maximum observed mapping quality score for the reference and alternate alleles
                 int[] rmq = referencePileup.getMappingQuals();
@@ -777,50 +794,79 @@ public class MuTect extends LocusWalker<Integer, Integer>  {
     private static Character MAPPED_BY_MATE = 'M';
     IndexedFastaSequenceFile refReader;
 
-    private LocusReadPile filterReads(final ReferenceContext ref, final ReadBackedPileup pile, boolean filterMateRescueReads) {
+    /**
+     * Removes reads which fail the read-level filters.  Whether a read passes depends only on the read and the
+     * reference at this locus, so the verdict for each read is remembered in passingReadCache (which must not be
+     * shared across loci or across different values of filterMateRescueReads)
+     */
+    private ReadBackedPileup filterReads(final ReferenceContext ref, final ReadBackedPileup pile, boolean filterMateRescueReads, final Map<GATKSAMRecord, Boolean> passingReadCache) {
         ArrayList<PileupElement> newPileupElements = new ArrayList<PileupElement>();
 
         for ( PileupElement p : pile ) {
             final GATKSAMRecord read = p.getRead();
 
-            // is this a heavily clipped read?
-            if (SequenceUtils.isReadHeavilySoftClipped(read, MTAC.HEAVILY_CLIPPED_READ_FRACTION)) {
-                continue;
+            Boolean passes = passingReadCache.get(read);
+            if (passes == null) {
+                passes = passesReadFilters(p, ref, filterMateRescueReads);
+                passingReadCache.put(read, passes);
             }
 
-            // is this a discordant read pair?
-            if(MTAC.EXCLUDE_CHIMERIC_READS && read.getMateReferenceIndex() != read.getReferenceIndex()) {
-                continue;
+            if (passes) {
+                newPileupElements.add(new PileupElement(p));
             }
-
-            // was this read ONLY placed because its mate was uniquely placed? (supplied by BWA)
-            if (filterMateRescueReads && MAPPED_BY_MATE.equals(read.getAttribute("XT"))) {
-                continue;
-            }
-
-            int mismatchQualitySum =
-                    CGAAlignmentUtils.mismatchesInRefWindow(p, ref, false, true);
-
-            // do we have too many mismatches overall?
-            if (mismatchQualitySum > MTAC.MAX_READ_MISMATCH_QUALITY_SCORE_SUM) {
-                continue;
-            }
-
-            // if we're here... we passed all the read filters!
-			            newPileupElements.add(new PileupElement(p));
-
-
         }
-        ReadBackedPileup newPileup =
-                new ReadBackedPileupImpl(ref.getLocus(), newPileupElements);
 
+        return new ReadBackedPileupImpl(ref.getLocus(), newPileupElements);
+    }
 
-        return new LocusReadPile(newPileup, (char)ref.getBase(), 0, 0, MTAC.ENABLE_QSCORE_OUTPUT);
+    private boolean passesReadFilters(final PileupElement p, final ReferenceContext ref, boolean filterMateRescueReads) {
+        final GATKSAMRecord read = p.getRead();
+
+        // is this a heavily clipped read?
+        if (SequenceUtils.isReadHeavilySoftClipped(read, MTAC.HEAVILY_CLIPPED_READ_FRACTION)) {
+            return false;
+        }
+
+        // is this a discordant read pair?
+        if(MTAC.EXCLUDE_CHIMERIC_READS && read.getMateReferenceIndex() != read.getReferenceIndex()) {
+            return false;
+        }
+
+        // was this read ONLY placed because its mate was uniquely placed? (supplied by BWA)
+        if (filterMateRescueReads && MAPPED_BY_MATE.equals(read.getAttribute("XT"))) {
+            return false;
+        }
+
+        int mismatchQualitySum =
+                CGAAlignmentUtils.mismatchesInRefWindow(p, ref, false, true);
+
+        // do we have too many mismatches overall?
+        if (mismatchQualitySum > MTAC.MAX_READ_MISMATCH_QUALITY_SCORE_SUM) {
+            return false;
+        }
+
+        // if we're here... we passed all the read filters!
+        return true;
     }
 
     public enum ReadSource { Tumor, Normal }
 
+    // the source (tumor,normal) is a property of the BAM reader a read came from, so remember it per reader
+    private final Map<Object, ReadSource> readSourceByReader = new IdentityHashMap<Object, ReadSource>();
+
     private ReadSource getReadSource(SAMRecord read) {
+        final Object reader = (read.getFileSource() == null) ? null : read.getFileSource().getReader();
+        if (reader != null) {
+            final ReadSource cached = readSourceByReader.get(reader);
+            if (cached != null) { return cached; }
+        }
+
+        final ReadSource source = lookupReadSource(read);
+        if (reader != null) { readSourceByReader.put(reader, source); }
+        return source;
+    }
+
+    private ReadSource lookupReadSource(SAMRecord read) {
         // check if it's a tumor
         SAMReaderID id = getToolkit().getReaderIDForRead(read);
         if (tumorSAMReaderIDs.contains(id)) { return ReadSource.Tumor; }
